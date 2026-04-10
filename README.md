@@ -1,4 +1,4 @@
-# Solar Sponge Automation
+# SolarReserve
 
 A highly advanced, dynamic Home Assistant custom integration designed to intelligently manage high-energy loads (like a "Solar Sponge" AC system) based on real-time solar forecasts and rolling historical energy usage.
 
@@ -37,7 +37,7 @@ To use this integration, you must have the following entities available in Home 
 ## Configuration
 
 1. Navigate to **Settings -> Devices & Services**.
-2. Click **+ Add Integration** and search for `Solar Sponge Automation`.
+2. Click **+ Add Integration** and search for `SolarReserve`.
 3. Follow the two-step wizard to map your energy inputs and battery constraints.
 
 ### Understanding the 36-Hour Deficit Calculation
@@ -50,7 +50,7 @@ The core of the integration is measuring `Surplus`. Specifically:
 If `(Available Energy - Required Energy)` is greater than 0, the exposed `binary_sensor.solar_sponge_permission` turns `on`!
 
 ## Exposed Sensors
-The integration automatically creates several sensors under its registered device:
+The integration automatically creates several sensors under its registered **SolarReserve** device:
 - `binary_sensor.solar_sponge_permission`: The master switch used to automate your appliances.
 - `sensor.overnight_load_tracker`: Your true baseline energy used during the current/last night.
 - `sensor.daytime_load_tracker`: Your true baseline energy used during the current/last day.
