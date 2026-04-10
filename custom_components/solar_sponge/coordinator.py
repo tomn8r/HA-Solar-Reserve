@@ -13,7 +13,8 @@ from .const import (
     CONF_SOLAR_TOMORROW,
     CONF_METER_RESETS_DAILY,
     CONF_BATTERY_SENSOR_TYPE,
-    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_CAPACITY_ENTITY,
+    CONF_BATTERY_CAPACITY_MANUAL,
     CONF_EMERGENCY_RESERVE_PERCENT,
     CONF_AC_ENERGY,
     DEFAULT_AVG_NIGHT_LOAD,
@@ -63,6 +64,10 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
             "tomorrow_deficit": 0.0,
         }
 
+    def _get_config(self, key, default=None):
+        """Get config from options first, then data."""
+        return self.entry.options.get(key, self.entry.data.get(key, default))
+
     async def async_initialize(self):
         """Load stored data and setup listeners."""
         stored = await self._store.async_load()
@@ -72,15 +77,21 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
         self._recalc_average()
 
         entities = [
-            self.entry.data.get(CONF_TOTAL_HOME_ENERGY),
-            self.entry.data.get("battery_remaining"),
-            self.entry.data.get(CONF_SOLAR_REMAINING_TODAY),
-            self.entry.data.get(CONF_SOLAR_TOMORROW),
-            self.entry.data.get(CONF_AC_ENERGY),
+            self._get_config(CONF_TOTAL_HOME_ENERGY),
+            self._get_config("battery_remaining"),
+            self._get_config(CONF_SOLAR_REMAINING_TODAY),
+            self._get_config(CONF_SOLAR_TOMORROW),
+            self._get_config(CONF_AC_ENERGY),
         ]
-        capacity_raw = self.entry.data.get(CONF_BATTERY_CAPACITY, "")
-        if str(capacity_raw).startswith("sensor."):
-            entities.append(str(capacity_raw))
+        
+        # Support legacy fallback too
+        cap_ent = self._get_config(CONF_BATTERY_CAPACITY_ENTITY)
+        legacy_cap = self.entry.data.get("battery_capacity", "")
+        
+        if cap_ent:
+            entities.append(cap_ent)
+        elif str(legacy_cap).startswith("sensor."):
+            entities.append(str(legacy_cap))
             
         entities = [e for e in set(entities) if e is not None]
         
@@ -125,7 +136,6 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
         if state and state.state not in (None, "unknown", "unavailable"):
             try:
                 val = float(state.state)
-                # Unit Normalization Check
                 unit = state.attributes.get("unit_of_measurement", "")
                 if unit in ["W", "kW", "MW"]:
                     _LOGGER.error(f"Sensor {entity_id} is reporting Power ({unit}). You must use an Energy sensor (kWh)!")
@@ -146,21 +156,18 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
         start_val = self.data_store.get(start_key, current_val)
         max_val = self.data_store.get(max_key, start_val)
         
-        # Keep max updated
         if current_val > max_val:
             self.data_store[max_key] = current_val
             max_val = current_val
             
-        check_daily_reset = self.entry.data.get(CONF_METER_RESETS_DAILY, False)
+        check_daily_reset = self._get_config(CONF_METER_RESETS_DAILY, False)
         if check_daily_reset and current_val < start_val:
-            # Meter reset
             return max(0.0, (max_val - start_val) + current_val)
         return max(0.0, current_val - start_val)
 
     def _handle_sunset(self):
-        # 1. Tally the day load that just ended
-        home_used = self._get_usage_since(self.entry.data.get(CONF_TOTAL_HOME_ENERGY), "sunrise_energy", "max_energy_since_sunrise")
-        ac_used = self._get_usage_since(self.entry.data.get(CONF_AC_ENERGY), "sunrise_ac_energy", "max_ac_energy_since_sunrise")
+        home_used = self._get_usage_since(self._get_config(CONF_TOTAL_HOME_ENERGY), "sunrise_energy", "max_energy_since_sunrise")
+        ac_used = self._get_usage_since(self._get_config(CONF_AC_ENERGY), "sunrise_ac_energy", "max_ac_energy_since_sunrise")
         
         true_day_load = max(0.0, home_used - ac_used)
         self.data_store["daytime_load_tracker"] = true_day_load
@@ -171,22 +178,20 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
         self.data_store["daily_day_loads"] = loads
         self._recalc_average()
 
-        # 2. Setup the snapshots for the upcoming night
-        home_state = self._safe_float(self.entry.data.get(CONF_TOTAL_HOME_ENERGY))
+        home_state = self._safe_float(self._get_config(CONF_TOTAL_HOME_ENERGY))
         self.data_store["sunset_energy"] = home_state
         self.data_store["max_energy_since_sunset"] = home_state
         
-        if self.entry.data.get(CONF_AC_ENERGY):
-            ac_state = self._safe_float(self.entry.data.get(CONF_AC_ENERGY))
+        if self._get_config(CONF_AC_ENERGY):
+            ac_state = self._safe_float(self._get_config(CONF_AC_ENERGY))
             self.data_store["sunset_ac_energy"] = ac_state
             self.data_store["max_ac_energy_since_sunset"] = ac_state
             
         self.hass.async_create_task(self._store.async_save(self.data_store))
 
     def _handle_sunrise(self):
-        # 1. Tally the night load that just ended
-        home_used = self._get_usage_since(self.entry.data.get(CONF_TOTAL_HOME_ENERGY), "sunset_energy", "max_energy_since_sunset")
-        ac_used = self._get_usage_since(self.entry.data.get(CONF_AC_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset")
+        home_used = self._get_usage_since(self._get_config(CONF_TOTAL_HOME_ENERGY), "sunset_energy", "max_energy_since_sunset")
+        ac_used = self._get_usage_since(self._get_config(CONF_AC_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset")
         
         true_night_load = max(0.0, home_used - ac_used)
         self.data_store["overnight_load_tracker"] = true_night_load
@@ -197,13 +202,12 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
         self.data_store["daily_loads"] = loads
         self._recalc_average()
         
-        # 2. Setup snapshots for upcoming day
-        home_state = self._safe_float(self.entry.data.get(CONF_TOTAL_HOME_ENERGY))
+        home_state = self._safe_float(self._get_config(CONF_TOTAL_HOME_ENERGY))
         self.data_store["sunrise_energy"] = home_state
         self.data_store["max_energy_since_sunrise"] = home_state
         
-        if self.entry.data.get(CONF_AC_ENERGY):
-            ac_state = self._safe_float(self.entry.data.get(CONF_AC_ENERGY))
+        if self._get_config(CONF_AC_ENERGY):
+            ac_state = self._safe_float(self._get_config(CONF_AC_ENERGY))
             self.data_store["sunrise_ac_energy"] = ac_state
             self.data_store["max_ac_energy_since_sunrise"] = ac_state
 
@@ -224,26 +228,31 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
 
     def _recalculate(self):
         """Perform the main calculations."""
-        # Calculate Capacity
-        capacity_raw = self.entry.data.get(CONF_BATTERY_CAPACITY, "10.0")
-        if str(capacity_raw).startswith("sensor."):
-            capacity = self._safe_float(str(capacity_raw), 10.0)
+        # Calculate Capacity: Entity -> Manual -> Legacy fallback
+        cap_ent = self._get_config(CONF_BATTERY_CAPACITY_ENTITY)
+        cap_man = self._get_config(CONF_BATTERY_CAPACITY_MANUAL)
+        
+        if cap_ent:
+            capacity = self._safe_float(cap_ent, 10.0)
+        elif cap_man is not None:
+            capacity = float(cap_man)
         else:
-            try:
-                capacity = float(capacity_raw)
-            except ValueError:
-                capacity = 10.0
+            capacity_raw = self.entry.data.get("battery_capacity", "10.0")
+            if str(capacity_raw).startswith("sensor."):
+                capacity = self._safe_float(str(capacity_raw), 10.0)
+            else:
+                try: capacity = float(capacity_raw)
+                except ValueError: capacity = 10.0
 
-        # Calculate Current Battery
-        battery_sensor_state = self._safe_float(self.entry.data.get("battery_remaining"))
-        sensor_type = self.entry.data.get(CONF_BATTERY_SENSOR_TYPE, "energy")
+        battery_sensor_state = self._safe_float(self._get_config("battery_remaining"))
+        sensor_type = self._get_config(CONF_BATTERY_SENSOR_TYPE, "energy")
         if sensor_type == "percentage":
             current_battery = capacity * (battery_sensor_state / 100.0)
         else:
             current_battery = battery_sensor_state
             
-        solar_today = self._safe_float(self.entry.data.get(CONF_SOLAR_REMAINING_TODAY))
-        solar_tomorrow = self._safe_float(self.entry.data.get(CONF_SOLAR_TOMORROW))
+        solar_today = self._safe_float(self._get_config(CONF_SOLAR_REMAINING_TODAY))
+        solar_tomorrow = self._safe_float(self._get_config(CONF_SOLAR_TOMORROW))
         
         avg_night_load = self.calculated_data["avg_night_load"]
         avg_day_load = self.calculated_data["avg_day_load"]
@@ -252,22 +261,20 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
         is_night = sun_state and sun_state.state == "below_horizon"
         
         if is_night:
-            home_used = self._get_usage_since(self.entry.data.get(CONF_TOTAL_HOME_ENERGY), "sunset_energy", "max_energy_since_sunset")
-            ac_used = self._get_usage_since(self.entry.data.get(CONF_AC_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset")
+            home_used = self._get_usage_since(self._get_config(CONF_TOTAL_HOME_ENERGY), "sunset_energy", "max_energy_since_sunset")
+            ac_used = self._get_usage_since(self._get_config(CONF_AC_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset")
             used_so_far_tonight = max(0.0, home_used - ac_used)
             load_expected = max(0.0, avg_night_load - used_so_far_tonight)
         else:
-            # During the day, we must plan for the full night tonight
             load_expected = avg_night_load
             
         self.calculated_data["dynamic_expected_load"] = load_expected
         
-        # 36-Hour Mathematical Engine
         tomorrow_expected_usage = avg_day_load + avg_night_load
         tomorrow_deficit = max(0.0, tomorrow_expected_usage - solar_tomorrow)
         self.calculated_data["tomorrow_deficit"] = tomorrow_deficit
         
-        emergency_pct = float(self.entry.data.get(CONF_EMERGENCY_RESERVE_PERCENT, 0))
+        emergency_pct = float(self._get_config(CONF_EMERGENCY_RESERVE_PERCENT, 0))
         emergency_reserve = capacity * (emergency_pct / 100.0)
         
         total_reserve = tomorrow_deficit + emergency_reserve
