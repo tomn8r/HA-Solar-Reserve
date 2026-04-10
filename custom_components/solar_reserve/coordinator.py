@@ -222,9 +222,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
         self.data_store["sunset_energy"] = home_state
         self._session_max["max_energy_since_sunset"] = home_state
 
-        ac_entity = self._get_config(CONF_AC_ENERGY)
-        if ac_entity:
-            ac_state = self._safe_float(ac_entity)
+        load_entity = self._get_config(CONF_LOAD_ENERGY)
+        if load_entity:
+            ac_state = self._safe_float(load_entity)
             self.data_store["sunset_ac_energy"] = ac_state
             self._session_max["max_ac_energy_since_sunset"] = ac_state
 
@@ -255,9 +255,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
         self.data_store["sunrise_energy"] = home_state
         self._session_max["max_energy_since_sunrise"] = home_state
 
-        ac_entity = self._get_config(CONF_AC_ENERGY)
-        if ac_entity:
-            ac_state = self._safe_float(ac_entity)
+        load_entity = self._get_config(CONF_LOAD_ENERGY)
+        if load_entity:
+            ac_state = self._safe_float(load_entity)
             self.data_store["sunrise_ac_energy"] = ac_state
             self._session_max["max_ac_energy_since_sunrise"] = ac_state
 
@@ -322,7 +322,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
                 self._get_config(CONF_TOTAL_HOME_ENERGY), "sunset_energy", "max_energy_since_sunset"
             )
             ac_used = self._get_usage_since(
-                self._get_config(CONF_AC_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset"
+                self._get_config(CONF_LOAD_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset"
             )
             used_so_far_tonight = max(0.0, home_used - ac_used)
             load_expected = max(0.0, avg_night_load - used_so_far_tonight)
