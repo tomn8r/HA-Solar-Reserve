@@ -93,6 +93,25 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
         stored = await self._store.async_load()
         if stored:
             self.data_store.update(stored)
+        else:
+            # First run: seed snapshot values from the live sensor readings NOW.
+            # Without this, _get_usage_since treats the entire meter lifetime
+            # (e.g. 1,500 kWh cumulative) as energy used 'since the last snapshot',
+            # which completely breaks the dynamic load calculation.
+            home_entity = self._get_config(CONF_TOTAL_HOME_ENERGY)
+            load_entity = self._get_config(CONF_LOAD_ENERGY)
+            current_home = self._safe_float(home_entity) if home_entity else 0.0
+            current_load = self._safe_float(load_entity) if load_entity else 0.0
+            # Seed both sunset and sunrise snapshots to current reading
+            self.data_store["sunset_energy"] = current_home
+            self.data_store["sunrise_energy"] = current_home
+            self.data_store["sunset_ac_energy"] = current_load
+            self.data_store["sunrise_ac_energy"] = current_load
+            _LOGGER.info(
+                "HA Solar Reserve: first run detected. Seeding snapshots to current "
+                "sensor values (home=%.3f kWh, managed_load=%.3f kWh)",
+                current_home, current_load,
+            )
 
         # Seed session max values from the persisted snapshots
         self._session_max["max_energy_since_sunset"] = self.data_store["sunset_energy"]
