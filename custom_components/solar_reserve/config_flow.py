@@ -1,4 +1,4 @@
-"""Config flow for Solar Sponge Automation integration."""
+"""Config flow for HA Solar Reserve integration."""
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
@@ -96,7 +96,7 @@ def _validate_capacity(user_input, errors):
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Solar Sponge Automation."""
+    """Handle a config flow for HA Solar Reserve."""
 
     VERSION = 1
 
@@ -138,7 +138,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow for Solar Sponge."""
+    """Handle options flow for HA Solar Reserve."""
 
     def __init__(self):
         """Initialize options flow."""

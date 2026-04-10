@@ -1,6 +1,6 @@
-"""Constants for the Solar Sponge Automation integration."""
+"""Constants for the HA Solar Reserve integration."""
 
-DOMAIN = "solar_sponge"
+DOMAIN = "solar_reserve"
 NAME = "HA Solar Reserve"
 
 # Configuration Keys

@@ -1,4 +1,4 @@
-"""Binary sensor platform for Solar Sponge."""
+"""Binary sensor platform for HA Solar Reserve."""
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorDeviceClass
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -9,11 +9,11 @@ from .const import DOMAIN, NAME
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up the binary sensor platform."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([SolarSpongePermission(coordinator, entry)])
+    async_add_entities([SolarReservePermission(coordinator, entry)])
 
 
-class SolarSpongePermission(CoordinatorEntity, BinarySensorEntity):
-    """Representation of the Solar Sponge Permission sensor."""
+class SolarReservePermission(CoordinatorEntity, BinarySensorEntity):
+    """Representation of the HA Solar Reserve Permission sensor."""
 
     _attr_has_entity_name = True
 
@@ -32,7 +32,7 @@ class SolarSpongePermission(CoordinatorEntity, BinarySensorEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
             name=NAME,
-            manufacturer="Solar Sponge",
+            manufacturer="HA Solar Reserve",
             model="Energy Manager",
         )
 

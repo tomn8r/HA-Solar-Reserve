@@ -1,4 +1,4 @@
-"""Coordinator for Solar Sponge."""
+"""Coordinator for HA Solar Reserve."""
 import logging
 
 from homeassistant.core import HomeAssistant, callback
@@ -28,7 +28,7 @@ STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.storage"
 
 
-class SolarSpongeCoordinator(DataUpdateCoordinator):
+class SolarReserveCoordinator(DataUpdateCoordinator):
     """Class to manage fetching data from multiple states."""
 
     def __init__(self, hass: HomeAssistant, entry):

@@ -1,4 +1,4 @@
-"""Sensor platform for Solar Sponge."""
+"""Sensor platform for HA Solar Reserve."""
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
 from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -18,8 +18,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
     ])
 
 
-class _SolarSpongeSensorBase(CoordinatorEntity, SensorEntity):
-    """Shared base class for Solar Sponge sensors."""
+class _SolarReserveSensorBase(CoordinatorEntity, SensorEntity):
+    """Shared base class for HA Solar Reserve sensors."""
 
     _attr_has_entity_name = True
 
@@ -34,12 +34,12 @@ class _SolarSpongeSensorBase(CoordinatorEntity, SensorEntity):
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry.entry_id)},
             name=NAME,
-            manufacturer="Solar Sponge",
+            manufacturer="HA Solar Reserve",
             model="Energy Manager",
         )
 
 
-class OvernightLoadTracker(_SolarSpongeSensorBase):
+class OvernightLoadTracker(_SolarReserveSensorBase):
     """Overnight baseline energy used (current/last night, AC-isolated)."""
 
     def __init__(self, coordinator, entry):
@@ -65,7 +65,7 @@ class OvernightLoadTracker(_SolarSpongeSensorBase):
         }
 
 
-class AverageOvernightLoad(_SolarSpongeSensorBase):
+class AverageOvernightLoad(_SolarReserveSensorBase):
     """Rolling 7-day average of overnight baseline load."""
 
     def __init__(self, coordinator, entry):
@@ -83,7 +83,7 @@ class AverageOvernightLoad(_SolarSpongeSensorBase):
         return round(val, 2)
 
 
-class DaytimeLoadTracker(_SolarSpongeSensorBase):
+class DaytimeLoadTracker(_SolarReserveSensorBase):
     """Daytime baseline energy used (current/last day, AC-isolated)."""
 
     def __init__(self, coordinator, entry):
@@ -108,7 +108,7 @@ class DaytimeLoadTracker(_SolarSpongeSensorBase):
         }
 
 
-class AverageDaytimeLoad(_SolarSpongeSensorBase):
+class AverageDaytimeLoad(_SolarReserveSensorBase):
     """Rolling 7-day average of daytime baseline load."""
 
     def __init__(self, coordinator, entry):

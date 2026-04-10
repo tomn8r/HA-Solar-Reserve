@@ -1,5 +1,5 @@
 {
-  "domain": "solar_sponge",
+  "domain": "solar_reserve",
   "name": "HA Solar Reserve",
   "codeowners": [],
   "config_flow": true,

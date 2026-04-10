@@ -1,20 +1,20 @@
-"""Initialize the Solar Sponge Automation integration."""
+"""Initialize the HA Solar Reserve integration."""
 import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
-from .coordinator import SolarSpongeCoordinator
+from .coordinator import SolarReserveCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor", "binary_sensor"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Solar Sponge from a config entry."""
+    """Set up HA Solar Reserve from a config entry."""
     hass.data.setdefault(DOMAIN, {})
     
-    coordinator = SolarSpongeCoordinator(hass, entry)
+    coordinator = SolarReserveCoordinator(hass, entry)
     await coordinator.async_initialize()
 
     hass.data[DOMAIN][entry.entry_id] = coordinator

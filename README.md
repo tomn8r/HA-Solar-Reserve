@@ -30,8 +30,8 @@ To use this integration, you must have the following entities available in Home 
 4. Click **Download** and restart Home Assistant.
 
 ### Method 2: Manual Installation
-1. Download the `solar_sponge` folder from the `custom_components` directory in this repository.
-2. Copy the folder to your Home Assistant `custom_components` directory (`/config/custom_components/solar_sponge`).
+1. Download the `solar_reserve` folder from the `custom_components` directory in this repository.
+2. Copy the folder to your Home Assistant `custom_components` directory (`/config/custom_components/solar_reserve`).
 3. Restart Home Assistant.
 
 ## Configuration
