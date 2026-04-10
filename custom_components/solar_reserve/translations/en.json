@@ -3,10 +3,10 @@
     "step": {
       "user": {
         "title": "HA Solar Reserve – Step 1: House & Solar Inputs",
-        "description": "Select the sensors required to track your house's real baseline load and available solar.",
+        "description": "Select the sensors required to track your house's real baseline load and available solar. If you have a high-energy device (e.g. AC, EV charger, pool heater) you want excluded from your baseline, add its energy sensor as a Managed Load.",
         "data": {
           "total_home_energy": "Total Home Energy (Cumulative kWh)",
-          "ac_energy": "AC Energy Sensor (Optional. Isolates AC usage to find baseline)",
+          "load_energy": "Managed Load Sensor (Optional)",
           "meter_resets_daily": "Does your energy meter reset daily?",
           "solar_remaining_today": "Solar Forecast Remaining Today (kWh)",
           "solar_tomorrow": "Solar Forecast Tomorrow 24h (kWh)"
@@ -39,10 +39,10 @@
     "step": {
       "user": {
         "title": "HA Solar Reserve – Configure: Energy & Solar",
-        "description": "Modify the sensors required to track your house's real baseline load and available solar.",
+        "description": "Modify the sensors required to track your house's real baseline load and available solar. If you have a high-energy device (e.g. AC, EV charger, pool heater) you want excluded from your baseline, add its energy sensor as a Managed Load.",
         "data": {
           "total_home_energy": "Total Home Energy (Cumulative kWh)",
-          "ac_energy": "AC Energy Sensor (Optional)",
+          "load_energy": "Managed Load Sensor (Optional)",
           "meter_resets_daily": "Does your energy meter reset daily?",
           "solar_remaining_today": "Solar Forecast Remaining Today (kWh)",
           "solar_tomorrow": "Solar Forecast Tomorrow 24h (kWh)"

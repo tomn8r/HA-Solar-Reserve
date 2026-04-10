@@ -8,7 +8,7 @@ Instead of relying on arbitrary static battery reserves, Solar Sponge uses a **3
 
 - **36-Hour Predictive Engine**: Dynamically calculates the deficit between tomorrow's expected solar harvest and your next 24-hours of expected house load. It adjusts your battery reserve in real-time.
 - **Symmetrical Load Tracking**: Automatically tracks the exact amount of energy your house uses between Sunrise and Sunset (Day Load) and Sunset and Sunrise (Night Load).
-- **AC Baseline Isolation**: Optionally specify your AC's dedicated Energy Sensor. The integration mathematically isolates it from your Total Home Energy so that running the AC doesn't create a false feedback loop inflating your baseline averages.
+- **Managed Load Isolation**: Optionally specify a **Managed Load Energy Sensor** for any high-energy device you want excluded from your home's baseline (e.g. AC unit, EV charger, heated pool, sauna). The integration mathematically removes that device's consumption from your Total Home Energy, so running it doesn't create a false feedback loop inflating your expected baseline load.
 - **Unit Auto-Scaling**: Flawlessly supports `Wh`, `kWh`, and `MWh` sensors natively, auto-scaling them behind the scenes.
 - **Dynamic Configuration (Options Flow)**: Tweak your Emergency Reserve, change your Battery definitions, or swap out sensors on the fly without deleting the integration.
 - **Legacy Meter Support**: The mathematical engine seamlessly handles both perpetually cumulative energy meters and legacy meters that reset to zero at midnight.

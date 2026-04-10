@@ -17,7 +17,7 @@ from .const import (
     CONF_BATTERY_CAPACITY_ENTITY,
     CONF_BATTERY_CAPACITY_MANUAL,
     CONF_EMERGENCY_RESERVE_PERCENT,
-    CONF_AC_ENERGY,
+    CONF_LOAD_ENERGY,
     DEFAULT_AVG_NIGHT_LOAD,
     DEFAULT_AVG_DAY_LOAD,
 )
@@ -103,7 +103,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
             self._get_config(CONF_BATTERY_REMAINING),
             self._get_config(CONF_SOLAR_REMAINING_TODAY),
             self._get_config(CONF_SOLAR_TOMORROW),
-            self._get_config(CONF_AC_ENERGY),
+            self._get_config(CONF_LOAD_ENERGY),
         ]
 
         cap_ent = self._get_config(CONF_BATTERY_CAPACITY_ENTITY)
@@ -203,7 +203,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
             self._get_config(CONF_TOTAL_HOME_ENERGY), "sunrise_energy", "max_energy_since_sunrise"
         )
         ac_used = self._get_usage_since(
-            self._get_config(CONF_AC_ENERGY), "sunrise_ac_energy", "max_ac_energy_since_sunrise"
+            self._get_config(CONF_LOAD_ENERGY), "sunrise_ac_energy", "max_ac_energy_since_sunrise"
         )
 
         true_day_load = max(0.0, home_used - ac_used)
@@ -236,7 +236,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
             self._get_config(CONF_TOTAL_HOME_ENERGY), "sunset_energy", "max_energy_since_sunset"
         )
         ac_used = self._get_usage_since(
-            self._get_config(CONF_AC_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset"
+            self._get_config(CONF_LOAD_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset"
         )
 
         true_night_load = max(0.0, home_used - ac_used)

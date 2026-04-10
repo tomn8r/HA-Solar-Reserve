@@ -13,7 +13,7 @@ CONF_BATTERY_SENSOR_TYPE = "battery_sensor_type"
 CONF_BATTERY_CAPACITY_ENTITY = "battery_capacity_entity"
 CONF_BATTERY_CAPACITY_MANUAL = "battery_capacity_manual"
 CONF_EMERGENCY_RESERVE_PERCENT = "emergency_reserve_percent"
-CONF_AC_ENERGY = "ac_energy"
+CONF_LOAD_ENERGY = "load_energy"
 
 # Defaults
 DEFAULT_AVG_NIGHT_LOAD = 10.0

@@ -15,7 +15,7 @@ from .const import (
     CONF_BATTERY_CAPACITY_ENTITY,
     CONF_BATTERY_CAPACITY_MANUAL,
     CONF_EMERGENCY_RESERVE_PERCENT,
-    CONF_AC_ENERGY,
+    CONF_LOAD_ENERGY,
     NAME
 )
 
@@ -43,7 +43,7 @@ def _get_user_schema(defaults=None):
     schema = {}
     schema.update(_req(CONF_TOTAL_HOME_ENERGY, defaults, _ENTITY_SELECTOR))
     schema[vol.Required(CONF_METER_RESETS_DAILY, default=defaults.get(CONF_METER_RESETS_DAILY, False))] = bool
-    schema.update(_opt(CONF_AC_ENERGY, defaults, _ENTITY_SELECTOR))
+    schema.update(_opt(CONF_LOAD_ENERGY, defaults, _ENTITY_SELECTOR))
     schema.update(_req(CONF_SOLAR_REMAINING_TODAY, defaults, _ENTITY_SELECTOR))
     schema.update(_req(CONF_SOLAR_TOMORROW, defaults, _ENTITY_SELECTOR))
     return vol.Schema(schema)
