@@ -18,3 +18,4 @@ CONF_LOAD_ENERGY = "load_energy"
 # Defaults
 DEFAULT_AVG_NIGHT_LOAD = 10.0
 DEFAULT_AVG_DAY_LOAD = 10.0
+DEFAULT_APPLIANCE_POWER_KW = 3.0  # Assumed managed load draw for runtime estimation

@@ -21,7 +21,7 @@ class SolarReservePermission(CoordinatorEntity, BinarySensorEntity):
         """Initialize."""
         super().__init__(coordinator)
         self._entry = entry
-        self._attr_name = "HA Solar Reserve Permission"
+        self._attr_name = "Permission"
         self._attr_unique_id = f"{entry.entry_id}_solar_reserve_permission"
         self._attr_device_class = BinarySensorDeviceClass.POWER
         self._attr_icon = "mdi:sun-snowflake"
@@ -47,7 +47,7 @@ class SolarReservePermission(CoordinatorEntity, BinarySensorEntity):
         data = self.coordinator.data or {}
         return {
             "calculated_surplus_kwh": round(data.get("surplus_kwh", 0.0), 2),
-            "estimated_ac_runtime_hours": round(data.get("estimated_runtime", 0.0), 1),
+            "estimated_runtime_hours": round(data.get("estimated_runtime", 0.0), 1),
             "dynamic_expected_load_kwh": round(data.get("dynamic_expected_load", 10.0), 2),
             "tomorrow_deficit_kwh": round(data.get("tomorrow_deficit", 0.0), 2),
             "avg_night_load_kwh": round(data.get("avg_night_load", 10.0), 2),

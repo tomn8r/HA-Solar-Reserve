@@ -1,5 +1,5 @@
 """Sensor platform for HA Solar Reserve."""
-from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass
+from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.const import UnitOfEnergy
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -40,7 +40,7 @@ class _SolarReserveSensorBase(CoordinatorEntity, SensorEntity):
 
 
 class OvernightLoadTracker(_SolarReserveSensorBase):
-    """Overnight baseline energy used (current/last night, AC-isolated)."""
+    """Overnight baseline energy used (current/last night, managed load isolated)."""
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator, entry)
@@ -48,7 +48,7 @@ class OvernightLoadTracker(_SolarReserveSensorBase):
         self._attr_unique_id = f"{entry.entry_id}_overnight_load_tracker"
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        # No state_class: this is a calculated daily snapshot, not a meter
         self._attr_icon = "mdi:weather-night"
 
     @property
@@ -84,7 +84,7 @@ class AverageOvernightLoad(_SolarReserveSensorBase):
 
 
 class DaytimeLoadTracker(_SolarReserveSensorBase):
-    """Daytime baseline energy used (current/last day, AC-isolated)."""
+    """Daytime baseline energy used (current/last day, managed load isolated)."""
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator, entry)
@@ -92,7 +92,7 @@ class DaytimeLoadTracker(_SolarReserveSensorBase):
         self._attr_unique_id = f"{entry.entry_id}_daytime_load_tracker"
         self._attr_device_class = SensorDeviceClass.ENERGY
         self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
-        self._attr_state_class = SensorStateClass.MEASUREMENT
+        # No state_class: this is a calculated daily snapshot, not a meter
         self._attr_icon = "mdi:weather-sunny"
 
     @property

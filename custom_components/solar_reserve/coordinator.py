@@ -20,6 +20,7 @@ from .const import (
     CONF_LOAD_ENERGY,
     DEFAULT_AVG_NIGHT_LOAD,
     DEFAULT_AVG_DAY_LOAD,
+    DEFAULT_APPLIANCE_POWER_KW,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -345,6 +346,8 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
 
         self.calculated_data["surplus_kwh"] = surplus
         self.calculated_data["permission"] = surplus > 0
-        self.calculated_data["estimated_runtime"] = max(0.0, surplus / 3.0) if surplus > 0 else 0.0
+        self.calculated_data["estimated_runtime"] = (
+            max(0.0, surplus / DEFAULT_APPLIANCE_POWER_KW) if surplus > 0 else 0.0
+        )
 
         self.async_set_updated_data(self.calculated_data)
