@@ -78,7 +78,7 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
 
         entities = [
             self._get_config(CONF_TOTAL_HOME_ENERGY),
-            self._get_config("battery_remaining"),
+            self._get_config(CONF_BATTERY_REMAINING),
             self._get_config(CONF_SOLAR_REMAINING_TODAY),
             self._get_config(CONF_SOLAR_TOMORROW),
             self._get_config(CONF_AC_ENERGY),
@@ -123,9 +123,9 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
         if not new_state or not old_state:
             return
 
-        if old_state.state != "below_horizon" and new_state.state == "below_horizon":
+        if old_state.state == "above_horizon" and new_state.state == "below_horizon":
             self._handle_sunset()
-        elif old_state.state != "above_horizon" and new_state.state == "above_horizon":
+        elif old_state.state == "below_horizon" and new_state.state == "above_horizon":
             self._handle_sunrise()
             
         self._recalculate()
@@ -244,7 +244,7 @@ class SolarSpongeCoordinator(DataUpdateCoordinator):
                 try: capacity = float(capacity_raw)
                 except ValueError: capacity = 10.0
 
-        battery_sensor_state = self._safe_float(self._get_config("battery_remaining"))
+        battery_sensor_state = self._safe_float(self._get_config(CONF_BATTERY_REMAINING))
         sensor_type = self._get_config(CONF_BATTERY_SENSOR_TYPE, "energy")
         if sensor_type == "percentage":
             current_battery = capacity * (battery_sensor_state / 100.0)

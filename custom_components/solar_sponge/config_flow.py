@@ -122,11 +122,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     def __init__(self, config_entry: config_entries.ConfigEntry):
         """Initialize options flow."""
         self.config_entry = config_entry
-        self.options_data = dict(config_entry.options)
-        
-        # Seed initial options data from entry.data if empty
-        if not self.options_data:
-            self.options_data = dict(config_entry.data)
+        self.options_data = {**config_entry.data, **config_entry.options}
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
