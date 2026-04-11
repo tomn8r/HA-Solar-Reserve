@@ -20,9 +20,11 @@ from .const import (
     CONF_BATTERY_CAPACITY_MANUAL,
     CONF_EMERGENCY_RESERVE_PERCENT,
     CONF_LOAD_ENERGY,
+    CONF_MORNING_BUFFER_HOURS,
     DEFAULT_AVG_NIGHT_LOAD,
     DEFAULT_AVG_DAY_LOAD,
     DEFAULT_APPLIANCE_POWER_KW,
+    DEFAULT_MORNING_BUFFER_HOURS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -372,6 +374,16 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
                 return parsed if parsed else now
             except Exception:
                 return now
+                
+        # --- Morning Buffer Calculation ---
+        buffer_hours = float(self._get_config(CONF_MORNING_BUFFER_HOURS, DEFAULT_MORNING_BUFFER_HOURS))
+        last_sunset_dt = parse_str_time(self.data_store.get("last_sunset_time"))
+        last_sunrise_dt = parse_str_time(self.data_store.get("last_sunrise_time"))
+        
+        # Determine actual daylight duration for the buffer hourly rate (fallback to 12)
+        daylight_duration_secs = (last_sunset_dt - last_sunrise_dt).total_seconds()
+        daylight_hours = max(4.0, abs(daylight_duration_secs) / 3600.0)
+        morning_buffer_kwh = (avg_day_load / daylight_hours) * buffer_hours
 
         if is_night:
             home_used = self._get_usage_since(
@@ -428,6 +440,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
             
             # Overall expected combines rest of day + full night
             load_expected = rest_of_day_load + avg_night_load
+
+        # Append the morning buffer safely onto the expected load for the next dawn
+        load_expected += morning_buffer_kwh
 
         self.calculated_data["dynamic_expected_load"] = load_expected
         self.calculated_data["managed_load_usage_kwh"] = round(managed_load_used, 3)

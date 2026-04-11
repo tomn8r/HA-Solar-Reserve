@@ -9,7 +9,8 @@
           "load_energy": "Managed Load Sensor (Optional)",
           "meter_resets_daily": "Does your energy meter reset daily?",
           "solar_remaining_today": "Solar Forecast Remaining Today (kWh)",
-          "solar_tomorrow": "Solar Forecast Tomorrow 24h (kWh)"
+          "solar_tomorrow": "Solar Forecast Tomorrow 24h (kWh)",
+          "morning_buffer_hours": "Morning Dead-Zone Buffer (Hours)"
         }
       },
       "battery": {
@@ -45,7 +46,8 @@
           "load_energy": "Managed Load Sensor (Optional)",
           "meter_resets_daily": "Does your energy meter reset daily?",
           "solar_remaining_today": "Solar Forecast Remaining Today (kWh)",
-          "solar_tomorrow": "Solar Forecast Tomorrow 24h (kWh)"
+          "solar_tomorrow": "Solar Forecast Tomorrow 24h (kWh)",
+          "morning_buffer_hours": "Morning Dead-Zone Buffer (Hours)"
         }
       },
       "battery": {

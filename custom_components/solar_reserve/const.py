@@ -14,8 +14,10 @@ CONF_BATTERY_CAPACITY_ENTITY = "battery_capacity_entity"
 CONF_BATTERY_CAPACITY_MANUAL = "battery_capacity_manual"
 CONF_EMERGENCY_RESERVE_PERCENT = "emergency_reserve_percent"
 CONF_LOAD_ENERGY = "load_energy"
+CONF_MORNING_BUFFER_HOURS = "morning_buffer_hours"
 
 # Defaults
 DEFAULT_AVG_NIGHT_LOAD = 10.0
 DEFAULT_AVG_DAY_LOAD = 10.0
+DEFAULT_MORNING_BUFFER_HOURS = 1.5
 DEFAULT_APPLIANCE_POWER_KW = 3.0  # Assumed managed load draw for runtime estimation

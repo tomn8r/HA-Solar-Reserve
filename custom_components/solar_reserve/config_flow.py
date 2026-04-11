@@ -16,6 +16,7 @@ from .const import (
     CONF_BATTERY_CAPACITY_MANUAL,
     CONF_EMERGENCY_RESERVE_PERCENT,
     CONF_LOAD_ENERGY,
+    CONF_MORNING_BUFFER_HOURS,
     NAME
 )
 
@@ -46,6 +47,9 @@ def _get_user_schema(defaults=None):
     schema.update(_opt(CONF_LOAD_ENERGY, defaults, _ENTITY_SELECTOR))
     schema.update(_req(CONF_SOLAR_REMAINING_TODAY, defaults, _ENTITY_SELECTOR))
     schema.update(_req(CONF_SOLAR_TOMORROW, defaults, _ENTITY_SELECTOR))
+    schema[vol.Required(CONF_MORNING_BUFFER_HOURS, default=defaults.get(CONF_MORNING_BUFFER_HOURS, 1.5))] = selector.NumberSelector(
+        selector.NumberSelectorConfig(min=0, max=6.0, step=0.5, unit_of_measurement="hours")
+    )
     return vol.Schema(schema)
 
 
