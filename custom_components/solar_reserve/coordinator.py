@@ -5,6 +5,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
+import datetime
 
 from .const import (
     DOMAIN,
@@ -53,6 +55,8 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
             "sunrise_energy": 0.0,
             "sunrise_ac_energy": 0.0,
             "daily_day_loads": [],
+            "last_sunset_time": None,
+            "last_sunrise_time": None,
         }
 
         # In-memory only: rolling max values for meter-reset detection
@@ -112,6 +116,11 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
                 "sensor values (home=%.3f kWh, managed_load=%.3f kWh)",
                 current_home, current_load,
             )
+
+        if not self.data_store.get("last_sunset_time"):
+            self.data_store["last_sunset_time"] = dt_util.utcnow().isoformat()
+        if not self.data_store.get("last_sunrise_time"):
+            self.data_store["last_sunrise_time"] = dt_util.utcnow().isoformat()
 
         # Seed session max values from the persisted snapshots
         self._session_max["max_energy_since_sunset"] = self.data_store["sunset_energy"]
@@ -255,6 +264,8 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
             self.data_store["sunset_ac_energy"] = ac_state
             self._session_max["max_ac_energy_since_sunset"] = ac_state
 
+        self.data_store["last_sunset_time"] = dt_util.utcnow().isoformat()
+
         self.hass.async_create_task(self._store.async_save(self.data_store))
 
     def _handle_sunrise(self):
@@ -287,6 +298,8 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
             ac_state = self._safe_float(load_entity)
             self.data_store["sunrise_ac_energy"] = ac_state
             self._session_max["max_ac_energy_since_sunrise"] = ac_state
+
+        self.data_store["last_sunrise_time"] = dt_util.utcnow().isoformat()
 
         self.hass.async_create_task(self._store.async_save(self.data_store))
 
@@ -349,6 +362,17 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
         sun_state = self.hass.states.get("sun.sun")
         is_night = sun_state is not None and sun_state.state == "below_horizon"
 
+        now = dt_util.utcnow()
+
+        def parse_str_time(dt_str):
+            if not dt_str:
+                return now
+            try:
+                parsed = dt_util.parse_datetime(dt_str)
+                return parsed if parsed else now
+            except Exception:
+                return now
+
         if is_night:
             home_used = self._get_usage_since(
                 self._get_config(CONF_TOTAL_HOME_ENERGY), "sunset_energy", "max_energy_since_sunset"
@@ -357,15 +381,53 @@ class SolarReserveCoordinator(DataUpdateCoordinator):
                 self._get_config(CONF_LOAD_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset"
             )
             used_so_far_tonight = max(0.0, home_used - ac_used)
-            load_expected = max(0.0, avg_night_load - used_so_far_tonight)
+            
+            # Prorating
+            last_sunset = parse_str_time(self.data_store.get("last_sunset_time"))
+            next_rising_str = sun_state.attributes.get("next_rising") if sun_state else None
+            next_event = parse_str_time(next_rising_str) if next_rising_str else (now + datetime.timedelta(hours=12))
+            
+            if next_event <= now:
+                next_event = now + datetime.timedelta(hours=12)
+                
+            total_duration = (next_event - last_sunset).total_seconds()
+            remaining_duration = (next_event - now).total_seconds()
+            fraction_remaining = min(1.0, max(0.0, remaining_duration / max(1.0, total_duration)))
+
+            prorated_expected = avg_night_load * fraction_remaining
+            normal_expected = max(0.0, avg_night_load - used_so_far_tonight)
+            load_expected = max(prorated_expected, normal_expected)
+
             managed_load_used = self._get_usage_since(
                 self._get_config(CONF_LOAD_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset"
             )
         else:
-            load_expected = avg_night_load
+            home_used = self._get_usage_since(
+                self._get_config(CONF_TOTAL_HOME_ENERGY), "sunrise_energy", "max_energy_since_sunrise"
+            )
             managed_load_used = self._get_usage_since(
                 self._get_config(CONF_LOAD_ENERGY), "sunrise_ac_energy", "max_ac_energy_since_sunrise"
             )
+            used_so_far_today = max(0.0, home_used - managed_load_used)
+            
+            # Prorating for day
+            last_sunrise = parse_str_time(self.data_store.get("last_sunrise_time"))
+            next_setting_str = sun_state.attributes.get("next_setting") if sun_state else None
+            next_event = parse_str_time(next_setting_str) if next_setting_str else (now + datetime.timedelta(hours=12))
+            
+            if next_event <= now:
+                next_event = now + datetime.timedelta(hours=12)
+                
+            total_duration = (next_event - last_sunrise).total_seconds()
+            remaining_duration = (next_event - now).total_seconds()
+            fraction_remaining = min(1.0, max(0.0, remaining_duration / max(1.0, total_duration)))
+
+            prorated_expected_day = avg_day_load * fraction_remaining
+            normal_expected_day = max(0.0, avg_day_load - used_so_far_today)
+            rest_of_day_load = max(prorated_expected_day, normal_expected_day)
+            
+            # Overall expected combines rest of day + full night
+            load_expected = rest_of_day_load + avg_night_load
 
         self.calculated_data["dynamic_expected_load"] = load_expected
         self.calculated_data["managed_load_usage_kwh"] = round(managed_load_used, 3)
