@@ -137,11 +137,31 @@ class SolarReservePanel extends HTMLElement {
           font-size: 0.85rem;
           color: var(--secondary-text-color);
         }
+
+        .clickable {
+          cursor: pointer;
+          transition: background-color 0.2s;
+          border-radius: 4px;
+        }
+        .clickable:hover {
+          background-color: var(--secondary-background-color, rgba(128,128,128,0.1));
+        }
+
+        .config-link {
+          color: var(--primary-color);
+          text-decoration: none;
+          font-weight: 500;
+          font-size: 1rem;
+        }
+        .config-link:hover {
+          text-decoration: underline;
+        }
       </style>
 
       <div class="dashboard-container">
-        <div class="header">
+        <div class="header" style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap;">
           <h1>HA Solar Reserve Analytics</h1>
+          <a href="/config/integrations/integration/solar_reserve" class="config-link">⚙ Configure Integration</a>
         </div>
 
         <!-- Master Output Row -->
@@ -353,7 +373,35 @@ class SolarReservePanel extends HTMLElement {
     // Helper formatting
     const fw = (val, dec = 2) => val !== undefined && val !== null ? parseFloat(val).toFixed(dec) + ' kWh' : '-';
 
+    // Click handler helper
+    const bindEntity = (elementId, entityObj, description) => {
+        const el = this.shadowRoot.getElementById(elementId);
+        if (!el || !entityObj) return;
+        let row = el.closest('.metric-row') || el.closest('.status-container');
+        if (row) {
+            row.title = description;
+            row.classList.add('clickable');
+            row.onclick = () => {
+                this.dispatchEvent(new CustomEvent('hass-more-info', {
+                    detail: { entityId: entityObj.entity_id },
+                    bubbles: true,
+                    composed: true
+                }));
+            };
+        }
+    };
+
+    // Tooltip helper for pure UI calculated rows
+    const setTooltip = (elementId, description) => {
+        const el = this.shadowRoot.getElementById(elementId);
+        if (!el) return;
+        let row = el.closest('.metric-row') || el.closest('.status-container');
+        if (row) row.title = description;
+    };
+
     if (data.permission) {
+      bindEntity('permission-status', data.permission, 'Overall permission status based on calculated surplus.');
+      setTooltip('runtime-val', 'Estimated runtime in hours based on current surplus.');
       const el = this.shadowRoot.getElementById('permission-status');
       el.innerText = data.permission.state.toUpperCase();
       el.className = data.permission.state === 'on' ? 'status-value status-on' : 'status-value status-off';
@@ -378,6 +426,15 @@ class SolarReservePanel extends HTMLElement {
       this.shadowRoot.getElementById('tom-expected').innerText = fw(tExp);
       this.shadowRoot.getElementById('solar-tom').innerText = fw(attrs.raw_solar_tomorrow);
       
+      setTooltip('exp-load', 'Total dynamic load expected until the morning buffer finishes.');
+      setTooltip('dyn-day', 'Dynamic target to cover the rest of daytime usage.');
+      setTooltip('dyn-night', 'Dynamic target to cover overnight usage.');
+      setTooltip('dyn-buffer', 'Configured buffer to cover next morning before solar starts producing.');
+      setTooltip('tom-deficit', 'Expected 36-hour deficit, holding energy back if tomorrow is forecasted to be cloudy.');
+      setTooltip('tom-expected', 'Total expected usage tomorrow (day + night).');
+      setTooltip('solar-tom', 'Solar output forecast for tomorrow.');
+      setTooltip('dyn-emerg', 'Emergency reserve energy explicitly held back.');
+
       // Update Raw Config Inputs
       this.shadowRoot.getElementById('raw-home').innerText = fw(attrs.raw_home_energy);
       this.shadowRoot.getElementById('raw-managed').innerText = fw(attrs.raw_managed_load);
@@ -385,6 +442,12 @@ class SolarReservePanel extends HTMLElement {
       this.shadowRoot.getElementById('raw-solar-tom').innerText = fw(attrs.raw_solar_tomorrow);
       this.shadowRoot.getElementById('raw-battery').innerText = attrs.raw_battery_percent !== undefined && attrs.raw_battery_percent !== null ? attrs.raw_battery_percent + (attrs.raw_battery_percent <= 100 ? '%' : ' kWh') : '-';
       
+      setTooltip('raw-home', 'Raw tracking input for the total home energy consumption sensor.');
+      setTooltip('raw-managed', 'Raw tracking input for the managed load consumption sensor.');
+      setTooltip('raw-solar-today', 'Raw tracking input from the solar forecast for today output.');
+      setTooltip('raw-solar-tom', 'Raw tracking input from the solar forecast for tomorrow output.');
+      setTooltip('raw-battery', 'Raw tracking input from the battery status sensor.');
+
       // Calculate isolated battery
       if (data.batteryCap) {
         const rawSolarToday = parseFloat(attrs.raw_solar_today);
@@ -396,34 +459,68 @@ class SolarReservePanel extends HTMLElement {
         
         this.shadowRoot.getElementById('batt-charge').innerText = fw(currentBattery);
         this.shadowRoot.getElementById('solar-today').innerText = fw(rawSolarToday);
+        setTooltip('batt-charge', 'Calculated portion of battery charge currently available.');
+        setTooltip('solar-today', 'Estimated solar energy remaining for today.');
       }
     }
 
-    if (data.surplus) this.shadowRoot.getElementById('surplus-val').innerText = parseFloat(data.surplus.state).toFixed(2);
-    if (data.available) this.shadowRoot.getElementById('total-assets').innerText = fw(data.available.state);
-    if (data.required) this.shadowRoot.getElementById('total-liab').innerText = fw(data.required.state);
+    if (data.surplus) {
+        this.shadowRoot.getElementById('surplus-val').innerText = parseFloat(data.surplus.state).toFixed(2);
+        bindEntity('surplus-val', data.surplus, 'Raw kWh surplus/deficit driving the permission decision.');
+    }
+    
+    if (data.available) {
+        this.shadowRoot.getElementById('total-assets').innerText = fw(data.available.state);
+        bindEntity('total-assets', data.available, 'Total energy available right now: battery + remaining solar today.');
+    }
+    
+    if (data.required) {
+        this.shadowRoot.getElementById('total-liab').innerText = fw(data.required.state);
+        bindEntity('total-liab', data.required, 'Total energy the system needs to hold in reserve.');
+    }
     
     // Battery Configs
     if (data.batteryCap) {
       this.shadowRoot.getElementById('batt-cap').innerText = fw(data.batteryCap.state);
       this.shadowRoot.getElementById('raw-cap').innerText = fw(data.batteryCap.state);
+      bindEntity('batt-cap', data.batteryCap, 'The battery capacity value actually being used by the engine.');
+      bindEntity('raw-cap', data.batteryCap, 'The battery capacity value actually being used by the engine.');
     }
 
     if (data.actNight) {
       this.shadowRoot.getElementById('night-actual').innerText = fw(data.actNight.state);
       this.shadowRoot.getElementById('sunset-snap').innerText = fw(data.actNight.attributes.sunset_snapshot_kwh);
+      bindEntity('night-actual', data.actNight, 'Overnight baseline energy used (current/last night, managed load isolated).');
+      bindEntity('sunset-snap', data.actNight, 'Snapshot of energy taken at last sunset.');
     }
-    if (data.avgNight) this.shadowRoot.getElementById('night-avg').innerText = fw(data.avgNight.state);
+    if (data.avgNight) {
+        this.shadowRoot.getElementById('night-avg').innerText = fw(data.avgNight.state);
+        bindEntity('night-avg', data.avgNight, 'Rolling 7-day average of overnight baseline load.');
+    }
 
     if (data.actDay) {
       this.shadowRoot.getElementById('day-actual').innerText = fw(data.actDay.state);
       this.shadowRoot.getElementById('sunrise-snap').innerText = fw(data.actDay.attributes.sunrise_snapshot_kwh);
+      bindEntity('day-actual', data.actDay, 'Daytime baseline energy used (current/last day, managed load isolated).');
+      bindEntity('sunrise-snap', data.actDay, 'Snapshot of energy taken at last sunrise.');
     }
-    if (data.avgDay) this.shadowRoot.getElementById('day-avg').innerText = fw(data.avgDay.state);
+    if (data.avgDay) {
+        this.shadowRoot.getElementById('day-avg').innerText = fw(data.avgDay.state);
+        bindEntity('day-avg', data.avgDay, 'Rolling 7-day average of daytime baseline load.');
+    }
 
-    if (data.managed) this.shadowRoot.getElementById('managed-load').innerText = fw(data.managed.state, 3);
-    if (data.nightDays) this.shadowRoot.getElementById('warmup-night').innerText = data.nightDays.state;
-    if (data.dayDays) this.shadowRoot.getElementById('warmup-day').innerText = data.dayDays.state;
+    if (data.managed) {
+        this.shadowRoot.getElementById('managed-load').innerText = fw(data.managed.state, 3);
+        bindEntity('managed-load', data.managed, 'Energy consumed by the managed load sensor since the last sunrise/sunset snapshot.');
+    }
+    if (data.nightDays) {
+        this.shadowRoot.getElementById('warmup-night').innerText = data.nightDays.state;
+        bindEntity('warmup-night', data.nightDays, 'Number of nights of data collected for the overnight rolling average (0–7).');
+    }
+    if (data.dayDays) {
+        this.shadowRoot.getElementById('warmup-day').innerText = data.dayDays.state;
+        bindEntity('warmup-day', data.dayDays, 'Number of days of data collected for the daytime rolling average (0–7).');
+    }
   }
 }
 
