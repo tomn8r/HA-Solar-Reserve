@@ -62,6 +62,10 @@ The integration provides a comprehensive set of diagnostic sensors for full tran
 
 ## Changelog
 
+### v1.1.0-beta.2 (Folder Synchronization Fix)
+- **Critical Fix:** Synchronized internal folder name (`solar_reserve`) with defined domain to resolve HACS/HA loading errors.
+- **Protocol Update:** Added mandatory directory consistency check to AI deployment workflow.
+
 ### v1.1.0-beta.1 (Hardened Beta Release)
 - **New Dashboard:** Complete redesign with "Balance Sheet" layout and interactive logic tooltips.
 - **Interactive UI:** Added click-to-open entity popups and a direct "⚙ Configure" link.

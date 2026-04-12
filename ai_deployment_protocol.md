@@ -5,6 +5,7 @@ This document is a **Skill File** for Antigravity AI agents. It defines the stri
 ## 1. Audit Phase
 Before committing, the agent must:
 - Run `git status` and `git diff` to summarize all changes since the last version.
+- **MANDATORY:** Verify that the directory name inside `custom_components/` matches exactly the `DOMAIN` variable in `custom_components/*/const.py`.
 - Ensure no sensitive information (API keys, personal IPs) is in the code.
 - Verify that `custom_components/solar_reserve/frontend/solar-reserve-panel.js` is updated if UI changes were made.
 
