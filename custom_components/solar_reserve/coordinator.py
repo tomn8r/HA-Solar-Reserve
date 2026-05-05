@@ -36,7 +36,6 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
-STORAGE_KEY = f"{DOMAIN}.storage"
 
 
 class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
@@ -51,7 +50,13 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             update_interval=None,
         )
         self.entry = entry
-        self._store = Store[dict](hass, STORAGE_VERSION, STORAGE_KEY)
+        # Scope the storage key to this config entry's unique ID so that
+        # a reinstall (which gets a new entry_id) always starts with a clean
+        # store and triggers the first-run snapshot seeding below.  Using a
+        # shared key meant the old stale snapshots survived reinstalls and
+        # caused _get_usage_since to report the entire meter lifetime as
+        # "used since the last snapshot".
+        self._store = Store[dict](hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}")
 
         # Persisted store: snapshot values and rolling load averages only
         self.data_store = {
