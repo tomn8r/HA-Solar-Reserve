@@ -35,6 +35,7 @@ async def async_setup_entry(
         EnergyAvailable(coordinator, entry),
         EnergyRequired(coordinator, entry),
         SolarCountedToday(coordinator, entry),
+        CurrentBatteryCharge(coordinator, entry),
         # --- Warm-up progress ---
         NightDataDaysCollected(coordinator, entry),
         DayDataDaysCollected(coordinator, entry),
@@ -278,6 +279,29 @@ class SolarCountedToday(_SolarReserveSensorBase):
         return {
             "raw_solar_forecast_kwh": round(raw, 2) if raw is not None else None,
         }
+
+
+class CurrentBatteryCharge(_SolarReserveSensorBase):
+    """Current battery charge in kWh.
+
+    Calculated from the configured battery sensor. When the battery reports a
+    percentage this is capacity × (percentage / 100). When it reports energy
+    directly this mirrors the sensor reading.
+    """
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry)
+        self._attr_name = "Current Battery Charge"
+        self._attr_unique_id = f"{entry.entry_id}_current_battery_charge"
+        self._attr_device_class = SensorDeviceClass.ENERGY
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:battery-charging"
+
+    @property
+    def native_value(self):
+        val = self.coordinator.data.get("current_battery_kwh")
+        return round(val, 2) if val is not None else None
 
 
 # ---------------------------------------------------------------------------

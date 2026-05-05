@@ -78,6 +78,8 @@ class SolarReservePermission(CoordinatorEntity[SolarReserveCoordinator], BinaryS
             "raw_solar_today": data.get("raw_solar_today"),
             "raw_solar_tomorrow": data.get("raw_solar_tomorrow"),
             "raw_battery_percent": data.get("raw_battery_percent"),
+            "battery_sensor_type": data.get("battery_sensor_type", "energy"),
+            "is_night": data.get("is_night", False),
             "dyn_rest_of_day_kwh": data.get("dyn_rest_of_day_kwh"),
             "dyn_rest_of_night_kwh": data.get("dyn_rest_of_night_kwh"),
             "dyn_morning_buffer_kwh": data.get("dyn_morning_buffer_kwh"),
