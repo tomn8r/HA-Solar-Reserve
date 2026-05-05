@@ -94,10 +94,14 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             "energy_available_kwh": 0.0,
             "energy_required_kwh": 0.0,
             "solar_counted_kwh": 0.0,
+            "current_battery_kwh": 0.0,
             "resolved_battery_capacity_kwh": 10.0,
             "managed_load_usage_kwh": 0.0,
             "night_data_days": 0,
             "day_data_days": 0,
+            # Dashboard UX metadata
+            "is_night": False,
+            "battery_sensor_type": "energy",
         }
 
     def _get_config(self, key, default=None):
@@ -381,6 +385,11 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         # --- Dynamic expected load (shrinks through the night as house uses energy) ---
         sun_state = self.hass.states.get("sun.sun")
         is_night = sun_state is not None and sun_state.state == "below_horizon"
+
+        # Export current battery kWh and metadata for dashboard display
+        self.calculated_data["current_battery_kwh"] = round(current_battery, 2)
+        self.calculated_data["is_night"] = is_night
+        self.calculated_data["battery_sensor_type"] = sensor_type
 
         # After midnight and before sunrise the solar forecast sensor resets to the
         # full day's expected generation, but none of that energy is available yet.
