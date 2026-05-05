@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solar Reserve Panel — Local Demo</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111827;
+      /* HA CSS variables used by the panel */
+      --primary-background-color: #111827;
+      --card-background-color: #1f2937;
+      --ha-card-background: #1f2937;
+      --primary-text-color: #f3f4f6;
+      --secondary-text-color: #9ca3af;
+      --divider-color: rgba(255,255,255,0.1);
+      --secondary-background-color: rgba(255,255,255,0.07);
+      --primary-color: #38bdf8;
+      --success-color: #4ade80;
+      --error-color: #f87171;
+      --warning-color: #fb923c;
+      --ha-card-border-radius: 12px;
+      --ha-card-box-shadow: 0 4px 6px -1px rgba(0,0,0,0.4);
+      --text-primary-color: #fff;
+      --paper-font-body1_-_font-family: 'Inter', system-ui, sans-serif;
+    }
+    solar-reserve-panel {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <solar-reserve-panel id="panel"></solar-reserve-panel>
+  <script src="solar-reserve-panel.js"></script>
+  <script>
+    // ---------------------------------------------------------------------------
+    // Mock HA state object — edit these values to test different scenarios.
+    // ---------------------------------------------------------------------------
+    const mockStates = {
+      "binary_sensor.ha_solar_reserve_permission": {
+        entity_id: "binary_sensor.ha_solar_reserve_permission",
+        state: "on",
+        last_changed: new Date(Date.now() - 25 * 60000).toISOString(),
+        attributes: {
+          friendly_name: "HA Solar Reserve Permission",
+          calculated_surplus_kwh: 4.82,
+          estimated_runtime_hours: 1.6,
+          dynamic_expected_load_kwh: 9.14,
+          tomorrow_deficit_kwh: 1.80,
+          avg_night_load_kwh: 4.61,
+          avg_day_load_kwh: 8.12,
+          is_night: false,
+          battery_sensor_type: "percentage",
+          raw_home_energy: 15482.44,
+          raw_managed_load: 125.73,
+          raw_solar_today: 6.20,
+          raw_solar_tomorrow: 18.50,
+          raw_battery_percent: 78,
+          dyn_rest_of_day_kwh: 3.44,
+          dyn_rest_of_night_kwh: 4.61,
+          dyn_morning_buffer_kwh: 1.09,
+          dyn_emergency_reserve_kwh: 0.50,
+        }
+      },
+      "sensor.ha_solar_reserve_calculated_surplus": {
+        entity_id: "sensor.ha_solar_reserve_calculated_surplus",
+        state: "4.82",
+        attributes: {
+          friendly_name: "HA Solar Reserve Calculated Surplus",
+          unit_of_measurement: "kWh",
+          permission: true,
+          estimated_runtime_hours: 1.6,
+        }
+      },
+      "sensor.ha_solar_reserve_energy_available": {
+        entity_id: "sensor.ha_solar_reserve_energy_available",
+        state: "20.96",
+        attributes: { friendly_name: "HA Solar Reserve Energy Available", unit_of_measurement: "kWh" }
+      },
+      "sensor.ha_solar_reserve_energy_required": {
+        entity_id: "sensor.ha_solar_reserve_energy_required",
+        state: "16.14",
+        attributes: {
+          friendly_name: "HA Solar Reserve Energy Required",
+          unit_of_measurement: "kWh",
+          dynamic_expected_load_kwh: 9.14,
+          tomorrow_deficit_kwh: 1.80,
+        }
+      },
+      "sensor.ha_solar_reserve_current_battery_charge": {
+        entity_id: "sensor.ha_solar_reserve_current_battery_charge",
+        state: "14.76",
+        attributes: { friendly_name: "HA Solar Reserve Current Battery Charge", unit_of_measurement: "kWh" }
+      },
+      "sensor.ha_solar_reserve_battery_capacity": {
+        entity_id: "sensor.ha_solar_reserve_battery_capacity",
+        state: "18.9",
+        attributes: { friendly_name: "HA Solar Reserve Battery Capacity", unit_of_measurement: "kWh" }
+      },
+      "sensor.ha_solar_reserve_solar_counted_today": {
+        entity_id: "sensor.ha_solar_reserve_solar_counted_today",
+        state: "6.20",
+        attributes: {
+          friendly_name: "HA Solar Reserve Solar Counted Today",
+          unit_of_measurement: "kWh",
+          raw_solar_forecast_kwh: 6.20,
+        }
+      },
+      "sensor.ha_solar_reserve_overnight_load_tracker": {
+        entity_id: "sensor.ha_solar_reserve_overnight_load_tracker",
+        state: "4.23",
+        attributes: {
+          friendly_name: "HA Solar Reserve Overnight Load Tracker",
+          unit_of_measurement: "kWh",
+          sunset_snapshot_kwh: 15459.12,
+          days_in_average: 5,
+        }
+      },
+      "sensor.ha_solar_reserve_average_overnight_load": {
+        entity_id: "sensor.ha_solar_reserve_average_overnight_load",
+        state: "4.61",
+        attributes: { friendly_name: "HA Solar Reserve Average Overnight Load", unit_of_measurement: "kWh" }
+      },
+      "sensor.ha_solar_reserve_daytime_load_tracker": {
+        entity_id: "sensor.ha_solar_reserve_daytime_load_tracker",
+        state: "7.89",
+        attributes: {
+          friendly_name: "HA Solar Reserve Daytime Load Tracker",
+          unit_of_measurement: "kWh",
+          sunrise_snapshot_kwh: 15463.35,
+          days_in_average: 5,
+        }
+      },
+      "sensor.ha_solar_reserve_average_daytime_load": {
+        entity_id: "sensor.ha_solar_reserve_average_daytime_load",
+        state: "8.12",
+        attributes: { friendly_name: "HA Solar Reserve Average Daytime Load", unit_of_measurement: "kWh" }
+      },
+      "sensor.ha_solar_reserve_managed_load_usage": {
+        entity_id: "sensor.ha_solar_reserve_managed_load_usage",
+        state: "1.243",
+        attributes: { friendly_name: "HA Solar Reserve Managed Load Usage", unit_of_measurement: "kWh" }
+      },
+      "sensor.ha_solar_reserve_night_data_days_collected": {
+        entity_id: "sensor.ha_solar_reserve_night_data_days_collected",
+        state: "5",
+        attributes: { friendly_name: "HA Solar Reserve Night Data Days Collected", unit_of_measurement: "days" }
+      },
+      "sensor.ha_solar_reserve_day_data_days_collected": {
+        entity_id: "sensor.ha_solar_reserve_day_data_days_collected",
+        state: "5",
+        attributes: { friendly_name: "HA Solar Reserve Day Data Days Collected", unit_of_measurement: "days" }
+      },
+    };
+
+    const mockHass = {
+      states: mockStates,
+      auth: { data: { access_token: "demo-token" } },
+    };
+
+    // Inject into the panel
+    const panel = document.getElementById('panel');
+    panel.hass = mockHass;
+
+    // Simulate live updates every 5 seconds to test dynamic behaviour
+    setInterval(() => {
+      const surplus = (4 + Math.random() * 3 - 1).toFixed(2);
+      mockStates["sensor.ha_solar_reserve_calculated_surplus"].state = surplus;
+      mockStates["binary_sensor.ha_solar_reserve_permission"].attributes.calculated_surplus_kwh = parseFloat(surplus);
+      panel.hass = { ...mockHass };
+    }, 5000);
+  </script>
+</body>
+</html>

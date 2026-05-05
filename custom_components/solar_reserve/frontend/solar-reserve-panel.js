@@ -77,6 +77,20 @@ class SolarReservePanel extends HTMLElement {
           .grid-2 { grid-template-columns: 1fr; }
         }
 
+        /* On narrow screens formula operators disappear and items tile 2-per-row */
+        @media (max-width: 520px) {
+          .energy-formula {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: stretch;
+          }
+          .formula-op { display: none; }
+          .tracker-tiles {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+          }
+        }
+
         .metric-row {
           display: flex;
           justify-content: space-between;
@@ -180,8 +194,9 @@ class SolarReservePanel extends HTMLElement {
           flex-wrap: wrap;
         }
         .formula-item {
-          flex: 1;
-          min-width: 80px;
+          flex: 1 1 0;
+          min-width: 0;
+          min-height: 110px;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -194,8 +209,13 @@ class SolarReservePanel extends HTMLElement {
         .formula-item.formula-total {
           background: rgba(76, 175, 80, 0.12);
         }
-        .formula-icon  { font-size: 1.5rem; }
-        .formula-label { font-size: 0.78rem; color: var(--secondary-text-color); }
+        .formula-icon  { font-size: 1.5rem; flex-shrink: 0; }
+        .formula-label {
+          font-size: 0.78rem; color: var(--secondary-text-color);
+          min-height: 2.6em;
+          display: flex; align-items: center; justify-content: center;
+          text-align: center;
+        }
         .formula-value { font-size: 1.4rem; font-weight: 500; }
         .formula-unit  { font-size: 0.75rem; color: var(--secondary-text-color); }
         .formula-op {
@@ -207,6 +227,28 @@ class SolarReservePanel extends HTMLElement {
           padding: 0 2px;
           flex-shrink: 0;
         }
+
+        /* ── Surplus equation notation strip ─────────────────────────────── */
+        .surplus-equation {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 10px 16px;
+          background: var(--secondary-background-color, rgba(128,128,128,0.07));
+          border-radius: 8px;
+          font-size: 0.88rem;
+          color: var(--secondary-text-color);
+          flex-wrap: wrap;
+          text-align: center;
+        }
+        .eq-term { display: flex; align-items: baseline; gap: 4px; }
+        .eq-label { font-size: 0.82rem; }
+        .eq-val { font-weight: 600; font-size: 1rem; color: var(--primary-text-color); }
+        .eq-unit { font-size: 0.72rem; }
+        .eq-op { font-size: 1.2rem; font-weight: 300; padding: 0 2px; }
+        .eq-result-pos { color: var(--success-color, #4caf50) !important; }
+        .eq-result-neg { color: var(--error-color, #f44336) !important; }
 
         /* ── Loading placeholder ───────────────────────────────────────── */
         .loading {
@@ -302,6 +344,64 @@ class SolarReservePanel extends HTMLElement {
         }
         .export-btn:hover { opacity: 0.85; }
         .export-btn:disabled { opacity: 0.5; cursor: wait; }
+
+        /* ── Master Output footer strip ──────────────────────────────────── */
+        .master-footer {
+          display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+          padding: 10px 4px 2px; margin-top: 8px;
+          border-top: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+          color: var(--secondary-text-color); font-size: 0.9rem;
+        }
+        .master-footer-val { font-weight: 500; color: var(--primary-text-color); }
+
+        /* ── Liabilities formula total (red) ─────────────────────────────── */
+        .formula-item.formula-total-red { background: rgba(244, 67, 54, 0.10); }
+
+        /* ── Load Tracker Tiles ──────────────────────────────────────────── */
+        .tracker-tiles { display: flex; gap: 12px; flex-wrap: wrap; }
+        .tracker-tile {
+          flex: 1; min-width: 130px;
+          display: flex; flex-direction: column; align-items: center; text-align: center;
+          padding: 18px 12px 12px;
+          background: var(--secondary-background-color, rgba(128,128,128,0.07));
+          border-radius: 10px; gap: 2px;
+        }
+        .tracker-tile-managed { flex: 1 1 0; background: rgba(56,189,248,0.07); }
+        .tracker-icon { font-size: 1.8rem; line-height: 1; margin-bottom: 4px; }
+        .tracker-phase {
+          font-size: 0.75rem; color: var(--secondary-text-color);
+          text-transform: uppercase; letter-spacing: 0.06em; font-weight: 500;
+        }
+        .tracker-value { font-size: 2rem; font-weight: 500; line-height: 1.1; margin: 4px 0 0; }
+        .tracker-unit { font-size: 0.75rem; color: var(--secondary-text-color); }
+        .tracker-avg { font-size: 0.8rem; color: var(--secondary-text-color); margin-top: 4px; }
+        .tracker-snap { font-size: 0.78rem; color: var(--secondary-text-color); margin-top: 5px; }
+        .warmup-dots { display: flex; gap: 4px; margin: 7px 0 3px; justify-content: center; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--divider-color, rgba(128,128,128,0.2)); }
+        .dot.filled { background: var(--primary-color, #03a9f4); }
+        details.tracker-detail { width: 100%; margin-top: 4px; }
+        details.tracker-detail > summary.detail-summary { justify-content: center; font-size: 0.78rem; }
+
+        /* ── Collapsible raw inputs card ─────────────────────────────────── */
+        details.collapsible-card {
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          border-radius: var(--ha-card-border-radius, 12px);
+          box-shadow: var(--ha-card-box-shadow, 0px 2px 1px -1px rgba(0,0,0,0.2), 0px 1px 1px 0px rgba(0,0,0,0.14), 0px 1px 3px 0px rgba(0,0,0,0.12));
+          padding: 16px;
+        }
+        details.collapsible-card > summary {
+          list-style: none; cursor: pointer;
+          font-size: 1.25rem; font-weight: 500; color: var(--secondary-text-color);
+          display: flex; align-items: center; justify-content: space-between;
+          margin-bottom: 0;
+        }
+        details.collapsible-card > summary::-webkit-details-marker { display: none; }
+        details.collapsible-card > summary::after {
+          content: '▼'; font-size: 0.7rem; color: var(--secondary-text-color);
+          transition: transform 0.15s; flex-shrink: 0;
+        }
+        details[open].collapsible-card > summary::after { transform: rotate(180deg); }
+        details.collapsible-card > .grid-2 { margin-top: 16px; }
       </style>
 
       <div class="dashboard-container">
@@ -331,45 +431,27 @@ class SolarReservePanel extends HTMLElement {
           </div>
         </div>
 
-        <!-- Master Output + System Intel -->
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-header">Master Output</div>
-            <div class="grid-2">
-              <div class="status-container">
-                <div class="status-label">Permission</div>
-                <div id="permission-status" class="status-value status-off">-</div>
-                <div id="permission-since" class="permission-since"></div>
+        <!-- Master Output -->
+        <div class="card">
+          <div class="card-header">Master Output</div>
+          <div class="grid-2">
+            <div class="status-container">
+              <div class="status-label">Permission</div>
+              <div id="permission-status" class="status-value status-off">-</div>
+              <div id="permission-since" class="permission-since"></div>
+            </div>
+            <div class="status-container">
+              <div class="status-label">Calculated Surplus</div>
+              <div style="display:flex; align-items:baseline; justify-content:center; gap:6px;">
+                <div id="surplus-val" class="status-value status-neutral">-</div>
+                <span id="surplus-trend" class="trend-indicator"></span>
               </div>
-              <div class="status-container">
-                <div class="status-label">Calculated Surplus</div>
-                <div style="display:flex; align-items:baseline; justify-content:center; gap:6px;">
-                  <div id="surplus-val" class="status-value status-neutral">-</div>
-                  <span id="surplus-trend" class="trend-indicator"></span>
-                </div>
-                <div class="status-label">kWh</div>
-              </div>
+              <div class="status-label">kWh</div>
             </div>
           </div>
-
-          <div class="card">
-            <div class="card-header">System Intel</div>
-            <div class="metric-row">
-              <span>Current Phase</span>
-              <span id="sun-phase" class="value">-</span>
-            </div>
-            <div class="metric-row">
-              <span>Estimated Runtime Remaining</span>
-              <span id="runtime-val" class="value">-</span>
-            </div>
-            <div class="metric-row">
-              <span>Data Warmup Nights (Max 7)</span>
-              <span id="warmup-night" class="value">-</span>
-            </div>
-            <div class="metric-row">
-              <span>Data Warmup Days (Max 7)</span>
-              <span id="warmup-day" class="value">-</span>
-            </div>
+          <div class="master-footer">
+            <span id="sun-phase">-</span>
+            <span>Runtime:&nbsp;<span id="runtime-val" class="master-footer-val">-</span></span>
           </div>
         </div>
 
@@ -377,7 +459,7 @@ class SolarReservePanel extends HTMLElement {
         <div class="grid-2">
           <!-- Assets -->
           <div class="card">
-            <div class="card-header">Energy Assets (Available)</div>
+            <div class="card-header">Energy Available</div>
 
             <!-- Formula: Battery + Solar = Total -->
             <div class="energy-formula">
@@ -403,115 +485,129 @@ class SolarReservePanel extends HTMLElement {
               </div>
             </div>
 
-            <div class="metric-row sub-row">
-              <span>Battery Rated Capacity</span>
-              <span id="batt-cap" class="value">-</span>
-            </div>
-            <div class="metric-row sub-row">
-              <span>Battery Input (Raw)</span>
-              <span id="raw-battery" class="value">-</span>
-            </div>
           </div>
 
-          <!-- Liabilities (collapsible) -->
+          <!-- Liabilities —— formula style, mirrors Assets -->
           <div class="card">
-            <div class="card-header">Energy Liabilities (Required)</div>
-
-            <div class="metric-row">
-              <span>Dynamic Expected Load</span>
-              <span id="exp-load" class="value">-</span>
-            </div>
-            <details class="detail-group" open>
-              <summary class="detail-summary">Load breakdown</summary>
-              <div class="metric-row sub-row">
-                <span id="dyn-day-label">Rest of Day Target</span>
-                <span id="dyn-day" class="value">-</span>
+            <div class="card-header">Energy Required</div>
+            <div class="energy-formula">
+              <div class="formula-item" id="exp-load-item">
+                <div class="formula-icon">📊</div>
+                <div class="formula-label">Expected Load</div>
+                <div id="exp-load" class="formula-value">—</div>
+                <div class="formula-unit">kWh</div>
               </div>
-              <div class="metric-row sub-row">
-                <span id="dyn-night-label">Rest of Night Target</span>
-                <span id="dyn-night" class="value">-</span>
+              <div class="formula-op">+</div>
+              <div class="formula-item" id="tom-deficit-item">
+                <div class="formula-icon">☁️</div>
+                <div class="formula-label">Tomorrow's Deficit</div>
+                <div id="tom-deficit" class="formula-value">—</div>
+                <div class="formula-unit">kWh</div>
               </div>
-              <div class="metric-row sub-row">
-                <span>Next Morning Buffer</span>
-                <span id="dyn-buffer" class="value">-</span>
+              <div class="formula-op">+</div>
+              <div class="formula-item" id="dyn-emerg-item">
+                <div class="formula-icon">🛡️</div>
+                <div class="formula-label">Emergency Reserve</div>
+                <div id="dyn-emerg" class="formula-value">—</div>
+                <div class="formula-unit">kWh</div>
               </div>
-            </details>
-
-            <div class="metric-row">
-              <span>Tomorrow's Deficit</span>
-              <span id="tom-deficit" class="value">-</span>
-            </div>
-            <details class="detail-group" open>
-              <summary class="detail-summary">Tomorrow's forecast</summary>
-              <div class="metric-row sub-row">
-                <span>Expected Tomorrow (Day+Night)</span>
-                <span id="tom-expected" class="value">-</span>
+              <div class="formula-op">=</div>
+              <div class="formula-item formula-total-red" id="total-liab-item">
+                <div class="formula-icon">⚡</div>
+                <div class="formula-label">Total Required</div>
+                <div id="total-liab" class="formula-value">—</div>
+                <div class="formula-unit">kWh</div>
               </div>
-              <div class="metric-row sub-row">
-                <span>Solar Output Tomorrow</span>
-                <span id="solar-tom" class="value">-</span>
-              </div>
-            </details>
-
-            <div class="metric-row">
-              <span>Emergency Reserve Segment</span>
-              <span id="dyn-emerg" class="value">-</span>
-            </div>
-
-            <div class="metric-row total-row">
-              <span>Total Energy Required</span>
-              <span id="total-liab" class="value" style="color:var(--error-color,#f44336);">-</span>
             </div>
           </div>
         </div>
 
-        <!-- Historical Breakdown -->
-        <div class="card">
-          <div class="card-header">Load Trackers &amp; Diagnostics</div>
-          <div class="grid-2">
-            <div>
-              <div class="metric-row">
-                <span>Overnight Usage (Current/Last)</span>
-                <span id="night-actual" class="value">-</span>
-              </div>
-              <div class="metric-row sub-row">
-                <span>Rolling 7-Night Average</span>
-                <span id="night-avg" class="value">-</span>
-              </div>
-              <div class="metric-row sub-row">
-                <span>Sunset Energy Snapshot</span>
-                <span id="sunset-snap" class="value">-</span>
-              </div>
+        <!-- Today's Load & Tomorrow's Load -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">Today's Load</div>
+            <div class="metric-row">
+              <span id="dyn-day-label">Rest of Day Target</span>
+              <span id="dyn-day" class="value">-</span>
             </div>
-            <div>
-              <div class="metric-row">
-                <span>Daytime Usage (Current/Last)</span>
-                <span id="day-actual" class="value">-</span>
-              </div>
-              <div class="metric-row sub-row">
-                <span>Rolling 7-Day Average</span>
-                <span id="day-avg" class="value">-</span>
-              </div>
-              <div class="metric-row sub-row">
-                <span>Sunrise Energy Snapshot</span>
-                <span id="sunrise-snap" class="value">-</span>
-              </div>
+            <div class="metric-row">
+              <span id="dyn-night-label">Rest of Night Target</span>
+              <span id="dyn-night" class="value">-</span>
+            </div>
+            <div class="metric-row">
+              <span>Morning Buffer</span>
+              <span id="dyn-buffer" class="value">-</span>
             </div>
           </div>
-          <div style="margin-top:16px; border-top:1px solid var(--divider-color,rgba(0,0,0,0.12)); padding-top:16px;">
+          <div class="card">
+            <div class="card-header">Tomorrow's Load</div>
             <div class="metric-row">
-              <span>Managed Load Usage Segment</span>
-              <span id="managed-load" class="value">-</span>
+              <span>Expected Usage (Day+Night)</span>
+              <span id="tom-expected" class="value">-</span>
             </div>
-            <div class="metric-row sub-row">
-              <span>Used since last horizon crossing</span>
+            <div class="metric-row">
+              <span>Solar Forecast Tomorrow</span>
+              <span id="solar-tom" class="value">-</span>
             </div>
           </div>
         </div>
 
-        <!-- Raw Configuration Inputs -->
+        <!-- Surplus equation notation: Available − Required = Surplus -->
+        <div class="surplus-equation">
+          <div class="eq-term">
+            <span class="eq-label">Available</span>
+            <span id="eq-available" class="eq-val">—</span>
+            <span class="eq-unit">kWh</span>
+          </div>
+          <span class="eq-op">−</span>
+          <div class="eq-term">
+            <span class="eq-label">Required</span>
+            <span id="eq-required" class="eq-val">—</span>
+            <span class="eq-unit">kWh</span>
+          </div>
+          <span class="eq-op">=</span>
+          <div class="eq-term">
+            <span class="eq-label">Surplus</span>
+            <span id="eq-surplus" class="eq-val">—</span>
+            <span class="eq-unit">kWh</span>
+          </div>
+        </div>
+
+        <!-- Load Trackers —— tile layout -->
         <div class="card">
-          <div class="card-header">Raw Configuration Inputs</div>
+          <div class="card-header">Load Trackers</div>
+          <div class="tracker-tiles">
+            <div class="tracker-tile" id="night-tile">
+              <div class="tracker-icon">🌙</div>
+              <div class="tracker-phase">Night</div>
+              <div id="night-actual" class="tracker-value">—</div>
+              <div class="tracker-unit">kWh</div>
+              <div id="night-avg-line" class="tracker-avg">—</div>
+              <div id="night-dots" class="warmup-dots"></div>
+              <div class="tracker-snap">Sunset: <span id="sunset-snap">—</span></div>
+            </div>
+            <div class="tracker-tile" id="day-tile">
+              <div class="tracker-icon">☀️</div>
+              <div class="tracker-phase">Day</div>
+              <div id="day-actual" class="tracker-value">—</div>
+              <div class="tracker-unit">kWh</div>
+              <div id="day-avg-line" class="tracker-avg">—</div>
+              <div id="day-dots" class="warmup-dots"></div>
+              <div class="tracker-snap">Sunrise: <span id="sunrise-snap">—</span></div>
+            </div>
+            <div class="tracker-tile tracker-tile-managed" id="managed-tile">
+              <div class="tracker-icon">⚡</div>
+              <div class="tracker-phase">Managed Load</div>
+              <div id="managed-load" class="tracker-value">—</div>
+              <div class="tracker-unit">kWh</div>
+              <div class="tracker-avg">Since last horizon crossing</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Raw Configuration Inputs —— collapsed by default -->
+        <details class="collapsible-card">
+          <summary>Raw Sensor Inputs</summary>
           <div class="grid-2">
             <div>
               <div class="metric-row">
@@ -542,7 +638,7 @@ class SolarReservePanel extends HTMLElement {
               </div>
             </div>
           </div>
-        </div>
+        </details>
 
       </div>
     `;
@@ -562,28 +658,35 @@ class SolarReservePanel extends HTMLElement {
 
     for (const [entityId, stateObj] of Object.entries(states)) {
       if (entityId.includes('solar_reserve')) {
-        if      (entityId.includes('solar_reserve_permission'))  data.permission      = stateObj;
-        else if (entityId.includes('calculated_surplus'))        data.surplus         = stateObj;
-        else if (entityId.includes('energy_available'))          data.available       = stateObj;
-        else if (entityId.includes('energy_required'))           data.required        = stateObj;
-        else if (entityId.includes('average_overnight_load'))    data.avgNight        = stateObj;
-        else if (entityId.includes('overnight_load_tracker'))    data.actNight        = stateObj;
-        else if (entityId.includes('average_daytime_load'))      data.avgDay          = stateObj;
-        else if (entityId.includes('daytime_load_tracker'))      data.actDay          = stateObj;
-        else if (entityId.includes('current_battery_charge'))    data.battCharge      = stateObj;
-        else if (entityId.includes('battery_capacity'))          data.batteryCap      = stateObj;
-        else if (entityId.includes('solar_counted_today'))       data.solarCounted    = stateObj;
-        else if (entityId.includes('managed_load_usage'))        data.managed         = stateObj;
-        else if (entityId.includes('night_data_days'))           data.nightDays       = stateObj;
-        else if (entityId.includes('day_data_days'))             data.dayDays         = stateObj;
+        if (entityId.includes('solar_reserve_permission')) data.permission = stateObj;
+        else if (entityId.includes('calculated_surplus')) data.surplus = stateObj;
+        else if (entityId.includes('energy_available')) data.available = stateObj;
+        else if (entityId.includes('energy_required')) data.required = stateObj;
+        else if (entityId.includes('average_overnight_load')) data.avgNight = stateObj;
+        else if (entityId.includes('overnight_load_tracker')) data.actNight = stateObj;
+        else if (entityId.includes('average_daytime_load')) data.avgDay = stateObj;
+        else if (entityId.includes('daytime_load_tracker')) data.actDay = stateObj;
+        else if (entityId.includes('current_battery_charge')) data.battCharge = stateObj;
+        else if (entityId.includes('battery_capacity')) data.batteryCap = stateObj;
+        else if (entityId.includes('solar_counted_today')) data.solarCounted = stateObj;
+        else if (entityId.includes('managed_load_usage')) data.managed = stateObj;
+        else if (entityId.includes('night_data_days')) data.nightDays = stateObj;
+        else if (entityId.includes('day_data_days')) data.dayDays = stateObj;
       }
     }
 
     // ── Formatting helpers ──────────────────────────────────────────────────
+    // fw = formatted kWh (for metric rows that have no separate unit element)
+    // fnum = number only (for formula tiles that have their own kWh unit div)
     const fw = (val, dec = 2) => {
       if (val === undefined || val === null) return 'Warming up…';
       const n = parseFloat(val);
       return isNaN(n) ? 'Warming up…' : n.toFixed(dec) + ' kWh';
+    };
+    const fnum = (val, dec = 2) => {
+      if (val === undefined || val === null) return '—';
+      const n = parseFloat(val);
+      return isNaN(n) ? '—' : n.toFixed(dec);
     };
 
     const setText = (id, text, isLoading = false) => {
@@ -596,7 +699,7 @@ class SolarReservePanel extends HTMLElement {
     const bindEntity = (elementId, entityObj, description) => {
       const el = this.shadowRoot.getElementById(elementId);
       if (!el || !entityObj) return;
-      const container = el.closest('.formula-item') || el.closest('.metric-row') || el.closest('.status-container');
+      const container = el.closest('.formula-item') || el.closest('.metric-row') || el.closest('.status-container') || el.closest('.tracker-tile');
       if (container) {
         container.title = description;
         container.classList.add('clickable');
@@ -619,7 +722,7 @@ class SolarReservePanel extends HTMLElement {
 
     // ── Warmup banner ───────────────────────────────────────────────────────
     const nightDayCount = data.nightDays ? parseInt(data.nightDays.state, 10) : 0;
-    const dayDayCount   = data.dayDays   ? parseInt(data.dayDays.state,   10) : 0;
+    const dayDayCount = data.dayDays ? parseInt(data.dayDays.state, 10) : 0;
     const warming = nightDayCount < 7 || dayDayCount < 7;
     const banner = this.shadowRoot.getElementById('warmup-banner');
     if (banner) {
@@ -634,15 +737,19 @@ class SolarReservePanel extends HTMLElement {
       }
     }
 
-    // ── Warmup counters in System Intel ────────────────────────────────────
-    if (data.nightDays) {
-      setText('warmup-night', data.nightDays.state + ' / 7');
-      bindEntity('warmup-night', data.nightDays, 'Number of nights of data collected for the overnight rolling average (0–7).');
-    }
-    if (data.dayDays) {
-      setText('warmup-day', data.dayDays.state + ' / 7');
-      bindEntity('warmup-day', data.dayDays, 'Number of days of data collected for the daytime rolling average (0–7).');
-    }
+    // ── Warmup dot renderer ──────────────────────────────────────────────────
+    const renderDots = (containerId, count, max = 7) => {
+      const el = this.shadowRoot.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML = Array.from({ length: max }, (_, i) =>
+        `<span class="dot${i < count ? ' filled' : ''}"></span>`
+      ).join('');
+    };
+
+    const nightCount = data.nightDays ? parseInt(data.nightDays.state, 10) : 0;
+    const dayCount = data.dayDays ? parseInt(data.dayDays.state, 10) : 0;
+    renderDots('night-dots', nightCount);
+    renderDots('day-dots', dayCount);
 
     // ── Permission sensor (master output + liabilities details) ─────────────
     if (data.permission) {
@@ -687,57 +794,59 @@ class SolarReservePanel extends HTMLElement {
           : '<span class="phase-badge phase-day" aria-label="Daytime phase">☀️ Daytime</span>';
       }
 
-      // Active/inactive load segment labels
-      const dayLabel   = this.shadowRoot.getElementById('dyn-day-label');
-      const nightLabel = this.shadowRoot.getElementById('dyn-night-label');
-      if (dayLabel)   dayLabel.className   = isNight ? 'segment-inactive' : 'segment-active';
-      if (nightLabel) nightLabel.className = isNight ? 'segment-active'   : 'segment-inactive';
+      // Liabilities formula tiles — use fnum (unit div already shows kWh)
+      setText('exp-load', fnum(attrs.dynamic_expected_load_kwh));
+      setText('tom-deficit', fnum(attrs.tomorrow_deficit_kwh));
+      setText('dyn-emerg', fnum(attrs.dyn_emergency_reserve_kwh));
 
-      // Liabilities detail rows
-      setText('exp-load',  fw(attrs.dynamic_expected_load_kwh));
-      setText('dyn-day',   fw(attrs.dyn_rest_of_day_kwh));
+      // Today's Load & Tomorrow's Load cards — use fw (no separate unit element)
+      setText('dyn-day', fw(attrs.dyn_rest_of_day_kwh));
       setText('dyn-night', fw(attrs.dyn_rest_of_night_kwh));
-      setText('dyn-buffer',fw(attrs.dyn_morning_buffer_kwh));
-      setText('tom-deficit',fw(attrs.tomorrow_deficit_kwh));
-      setText('dyn-emerg', fw(attrs.dyn_emergency_reserve_kwh));
+      setText('dyn-buffer', fw(attrs.dyn_morning_buffer_kwh));
 
-      const eDay   = parseFloat(attrs.avg_day_load_kwh)   || 0;
+      const eDay = parseFloat(attrs.avg_day_load_kwh) || 0;
       const eNight = parseFloat(attrs.avg_night_load_kwh) || 0;
       setText('tom-expected', fw(eDay + eNight));
       setText('solar-tom', fw(attrs.raw_solar_tomorrow));
 
-      setTooltip('exp-load',   'Total dynamic load expected until the morning buffer finishes.');
-      setTooltip('dyn-day',    'Dynamic target to cover the rest of daytime usage.');
-      setTooltip('dyn-night',  'Dynamic target to cover overnight usage.');
+      setTooltip('exp-load', 'Total dynamic load expected until the morning buffer finishes.');
+      setTooltip('dyn-day', 'Dynamic target to cover the rest of daytime usage.');
+      setTooltip('dyn-night', 'Dynamic target to cover overnight usage.');
       setTooltip('dyn-buffer', 'Configured buffer to cover next morning before solar starts producing.');
-      setTooltip('tom-deficit','Expected 36-hour deficit, holding energy back if tomorrow is forecasted to be cloudy.');
-      setTooltip('tom-expected','Total expected usage tomorrow (day + night).');
-      setTooltip('solar-tom',  'Solar output forecast for tomorrow.');
-      setTooltip('dyn-emerg',  'Emergency reserve energy explicitly held back.');
+      setTooltip('tom-deficit', 'Expected 36-hour deficit, holding energy back if tomorrow is forecasted to be cloudy.');
+      setTooltip('tom-expected', 'Total expected usage tomorrow (day + night).');
+      setTooltip('solar-tom', 'Solar output forecast for tomorrow.');
+      setTooltip('dyn-emerg', 'Emergency reserve energy explicitly held back.');
+
+      // Bind liabilities formula items to Energy Required entity
+      bindEntity('exp-load', data.required, 'Dynamic expected load for the current period.');
+      bindEntity('tom-deficit', data.required, 'Expected shortfall tomorrow if solar underperforms usage.');
+      bindEntity('dyn-emerg', data.required, 'Emergency reserve held back regardless of surplus.');
+      bindEntity('total-liab', data.required, 'Total energy the engine needs to hold in reserve.');
 
       // Raw config inputs
-      setText('raw-home',       fw(attrs.raw_home_energy));
-      setText('raw-managed',    fw(attrs.raw_managed_load));
-      setText('raw-solar-today',fw(attrs.raw_solar_today));
-      setText('raw-solar-tom',  fw(attrs.raw_solar_tomorrow));
+      setText('raw-home', fw(attrs.raw_home_energy));
+      setText('raw-managed', fw(attrs.raw_managed_load));
+      setText('raw-solar-today', fw(attrs.raw_solar_today));
+      setText('raw-solar-tom', fw(attrs.raw_solar_tomorrow));
 
       // Battery raw display — format using declared sensor type
       const battType = attrs.battery_sensor_type || 'energy';
-      const rawBatt  = attrs.raw_battery_percent;
+      const rawBatt = attrs.raw_battery_percent;
       let rawBattText = 'Warming up…';
       if (rawBatt !== undefined && rawBatt !== null) {
         rawBattText = battType === 'percentage'
           ? parseFloat(rawBatt).toFixed(1) + ' %'
           : parseFloat(rawBatt).toFixed(2) + ' kWh';
       }
-      setText('raw-battery',      rawBattText);
+      setText('raw-battery', rawBattText);
       setText('raw-battery-full', rawBattText);
-      setTooltip('raw-home',        'Raw tracking input for the total home energy consumption sensor.');
-      setTooltip('raw-managed',     'Raw tracking input for the managed load consumption sensor.');
+      setTooltip('raw-home', 'Raw tracking input for the total home energy consumption sensor.');
+      setTooltip('raw-managed', 'Raw tracking input for the managed load consumption sensor.');
       setTooltip('raw-solar-today', 'Raw tracking input from the solar forecast for today output.');
-      setTooltip('raw-solar-tom',   'Raw tracking input from the solar forecast for tomorrow output.');
-      setTooltip('raw-battery',     'Raw tracking input from the battery status sensor (' + battType + ').');
-      setTooltip('raw-battery-full','Raw tracking input from the battery status sensor (' + battType + ').');
+      setTooltip('raw-solar-tom', 'Raw tracking input from the solar forecast for tomorrow output.');
+      setTooltip('raw-battery', 'Raw tracking input from the battery status sensor (' + battType + ').');
+      setTooltip('raw-battery-full', 'Raw tracking input from the battery status sensor (' + battType + ').');
     }
 
     // ── Calculated Surplus + trend indicator ───────────────────────────────
@@ -774,8 +883,24 @@ class SolarReservePanel extends HTMLElement {
     // ── Total Energy Required ─────────────────────────────────────────────
     if (data.required) {
       const totalEl = this.shadowRoot.getElementById('total-liab');
-      if (totalEl) totalEl.innerText = fw(data.required.state);
+      if (totalEl) totalEl.innerText = fnum(data.required.state);
       bindEntity('total-liab', data.required, 'Total energy the system needs to hold in reserve.');
+    }
+
+    // ── Surplus equation strip ────────────────────────────────────────────
+    if (data.available && data.required) {
+      const avail = parseFloat(data.available.state);
+      const req   = parseFloat(data.required.state);
+      const surp  = avail - req;
+      const eqAvail  = this.shadowRoot.getElementById('eq-available');
+      const eqReq    = this.shadowRoot.getElementById('eq-required');
+      const eqSurp   = this.shadowRoot.getElementById('eq-surplus');
+      if (eqAvail) eqAvail.textContent = avail.toFixed(2);
+      if (eqReq)   eqReq.textContent   = req.toFixed(2);
+      if (eqSurp) {
+        eqSurp.textContent = (surp >= 0 ? '+' : '') + surp.toFixed(2);
+        eqSurp.className = surp >= 0 ? 'eq-val eq-result-pos' : 'eq-val eq-result-neg';
+      }
     }
 
     // ── Current Battery Charge (dedicated sensor) ──────────────────────────
@@ -795,44 +920,47 @@ class SolarReservePanel extends HTMLElement {
     // ── Battery Capacity ───────────────────────────────────────────────────
     if (data.batteryCap) {
       setText('batt-cap', fw(data.batteryCap.state));
-      setText('raw-cap',  fw(data.batteryCap.state));
+      setText('raw-cap', fw(data.batteryCap.state));
       bindEntity('batt-cap', data.batteryCap, 'The battery capacity value actually being used by the engine.');
-      bindEntity('raw-cap',  data.batteryCap, 'The battery capacity value actually being used by the engine.');
+      bindEntity('raw-cap', data.batteryCap, 'The battery capacity value actually being used by the engine.');
     }
 
     // ── Load Trackers ──────────────────────────────────────────────────────
     if (data.actNight) {
-      setText('night-actual', fw(data.actNight.state));
-      setText('sunset-snap',  fw(data.actNight.attributes.sunset_snapshot_kwh));
+      const el = this.shadowRoot.getElementById('night-actual');
+      if (el) el.textContent = parseFloat(data.actNight.state).toFixed(2);
+      setText('sunset-snap', fw(data.actNight.attributes.sunset_snapshot_kwh));
       bindEntity('night-actual', data.actNight, 'Overnight baseline energy used (current/last night, managed load isolated).');
-      bindEntity('sunset-snap',  data.actNight, 'Snapshot of energy taken at last sunset.');
+      bindEntity('sunset-snap', data.actNight, 'Snapshot of energy taken at last sunset.');
     }
     if (data.avgNight) {
-      setText('night-avg', fw(data.avgNight.state));
-      bindEntity('night-avg', data.avgNight, 'Rolling 7-day average of overnight baseline load.');
+      const el = this.shadowRoot.getElementById('night-avg-line');
+      if (el) el.textContent = '7-night avg: ' + parseFloat(data.avgNight.state).toFixed(2) + ' kWh';
     }
     if (data.actDay) {
-      setText('day-actual',   fw(data.actDay.state));
+      const el = this.shadowRoot.getElementById('day-actual');
+      if (el) el.textContent = parseFloat(data.actDay.state).toFixed(2);
       setText('sunrise-snap', fw(data.actDay.attributes.sunrise_snapshot_kwh));
-      bindEntity('day-actual',   data.actDay, 'Daytime baseline energy used (current/last day, managed load isolated).');
+      bindEntity('day-actual', data.actDay, 'Daytime baseline energy used (current/last day, managed load isolated).');
       bindEntity('sunrise-snap', data.actDay, 'Snapshot of energy taken at last sunrise.');
     }
     if (data.avgDay) {
-      setText('day-avg', fw(data.avgDay.state));
-      bindEntity('day-avg', data.avgDay, 'Rolling 7-day average of daytime baseline load.');
+      const el = this.shadowRoot.getElementById('day-avg-line');
+      if (el) el.textContent = '7-day avg: ' + parseFloat(data.avgDay.state).toFixed(2) + ' kWh';
     }
     if (data.managed) {
-      setText('managed-load', fw(data.managed.state, 3));
+      const el = this.shadowRoot.getElementById('managed-load');
+      if (el) el.textContent = parseFloat(data.managed.state).toFixed(3);
       bindEntity('managed-load', data.managed, 'Energy consumed by the managed load sensor since the last sunrise/sunset snapshot.');
     }
   }
 
   async _handleExport() {
-    const btn    = this.shadowRoot.getElementById('export-btn');
+    const btn = this.shadowRoot.getElementById('export-btn');
     const select = this.shadowRoot.getElementById('export-range');
     if (!btn || !select) return;
 
-    btn.disabled    = true;
+    btn.disabled = true;
     btn.textContent = '⏳ Exporting…';
 
     try {
@@ -847,15 +975,15 @@ class SolarReservePanel extends HTMLElement {
       console.error('Solar Reserve CSV export error:', e);
       alert('Export failed. See browser console for details.');
     } finally {
-      btn.disabled    = false;
+      btn.disabled = false;
       btn.textContent = '⬇ Export CSV';
     }
   }
 
   _exportSnapshot() {
     const states = this._hass.states;
-    const ts     = new Date().toISOString();
-    const rows   = [];
+    const ts = new Date().toISOString();
+    const rows = [];
 
     rows.push(['# Solar Reserve — Current Snapshot', ts]);
     rows.push([]);
@@ -907,7 +1035,7 @@ class SolarReservePanel extends HTMLElement {
   }
 
   async _exportHistory(hours) {
-    const states    = this._hass.states;
+    const states = this._hass.states;
     const entityIds = Object.keys(states).filter(id => id.includes('solar_reserve'));
 
     if (entityIds.length === 0) {
@@ -915,12 +1043,12 @@ class SolarReservePanel extends HTMLElement {
       return;
     }
 
-    const now   = new Date();
+    const now = new Date();
     const start = hours ? new Date(now - hours * 3600 * 1000) : new Date('2000-01-01T00:00:00Z');
-    const url   = `/api/history/period/${start.toISOString()}` +
-                  `?filter_entity_id=${entityIds.join(',')}` +
-                  `&minimal_response=false` +
-                  `&significant_changes_only=false`;
+    const url = `/api/history/period/${start.toISOString()}` +
+      `?filter_entity_id=${entityIds.join(',')}` +
+      `&minimal_response=false` +
+      `&significant_changes_only=false`;
 
     const resp = await fetch(url, {
       headers: { Authorization: `Bearer ${this._hass.auth.data.access_token}` },
@@ -928,9 +1056,9 @@ class SolarReservePanel extends HTMLElement {
     if (!resp.ok) throw new Error(`History API returned ${resp.status}`);
 
     const history = await resp.json();
-    const ts      = now.toISOString();
-    const label   = hours === 24 ? '24h' : hours === 168 ? '7d' : 'all';
-    const rows    = [];
+    const ts = now.toISOString();
+    const label = hours === 24 ? '24h' : hours === 168 ? '7d' : 'all';
+    const rows = [];
 
     rows.push(['# Solar Reserve — History Export', label, ts]);
     rows.push([]);
@@ -985,11 +1113,11 @@ class SolarReservePanel extends HTMLElement {
         ? '"' + s.replace(/"/g, '""') + '"'
         : s;
     };
-    const csv  = rows.map(r => Array.isArray(r) ? r.map(escape).join(',') : '').join('\r\n');
+    const csv = rows.map(r => Array.isArray(r) ? r.map(escape).join(',') : '').join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
