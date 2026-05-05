@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
+STORAGE_KEY = f"{DOMAIN}.storage"
 
 
 class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
@@ -50,13 +51,13 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             update_interval=None,
         )
         self.entry = entry
-        # Scope the storage key to this config entry's unique ID so that
-        # a reinstall (which gets a new entry_id) always starts with a clean
-        # store and triggers the first-run snapshot seeding below.  Using a
-        # shared key meant the old stale snapshots survived reinstalls and
-        # caused _get_usage_since to report the entire meter lifetime as
-        # "used since the last snapshot".
-        self._store = Store[dict](hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}")
+        # Single shared storage file for the integration.  A stored 'entry_id'
+        # field is used to detect reinstalls: if the stored id doesn't match the
+        # current entry, the data is from a previous install and snapshots are
+        # re-seeded from live sensor values.  This avoids both the stale-snapshot
+        # bug and the accumulation of orphaned per-entry storage files during
+        # active development.
+        self._store = Store[dict](hass, STORAGE_VERSION, STORAGE_KEY)
 
         # Persisted store: snapshot values and rolling load averages only
         self.data_store = {
@@ -116,13 +117,16 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
     async def async_initialize(self):
         """Load stored data and setup listeners."""
         stored = await self._store.async_load()
-        if stored:
+        # Only restore persisted data when it belongs to THIS config entry.
+        # If the stored entry_id is absent or mismatched the file is from a
+        # previous install; treat it as a first run and re-seed snapshots so
+        # that _get_usage_since doesn't report the meter's entire lifetime as
+        # 'energy used since the last snapshot'.
+        if stored and stored.get("entry_id") == self.entry.entry_id:
             self.data_store.update(stored)
         else:
-            # First run: seed snapshot values from the live sensor readings NOW.
-            # Without this, _get_usage_since treats the entire meter lifetime
-            # (e.g. 1,500 kWh cumulative) as energy used 'since the last snapshot',
-            # which completely breaks the dynamic load calculation.
+            # First run (or reinstall): seed snapshot values from live sensor
+            # readings NOW so the baseline is correct from the start.
             home_entity = self._get_config(CONF_TOTAL_HOME_ENERGY)
             load_entity = self._get_config(CONF_LOAD_ENERGY)
             current_home = self._safe_float(home_entity) if home_entity else 0.0
@@ -132,10 +136,11 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             self.data_store["sunrise_energy"] = current_home
             self.data_store["sunset_ac_energy"] = current_load
             self.data_store["sunrise_ac_energy"] = current_load
+            reason = "reinstall detected" if stored else "first run detected"
             _LOGGER.info(
-                "HA Solar Reserve: first run detected. Seeding snapshots to current "
+                "HA Solar Reserve: %s. Seeding snapshots to current "
                 "sensor values (home=%.3f kWh, managed_load=%.3f kWh)",
-                current_home, current_load,
+                reason, current_home, current_load,
             )
 
         if not self.data_store.get("last_sunset_time"):
@@ -289,6 +294,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             self._session_max["max_ac_energy_since_sunset"] = ac_state
 
         self.data_store["last_sunset_time"] = dt_util.utcnow().isoformat()
+        self.data_store["entry_id"] = self.entry.entry_id
 
         self.hass.async_create_task(self._store.async_save(self.data_store))
 
@@ -324,6 +330,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             self._session_max["max_ac_energy_since_sunrise"] = ac_state
 
         self.data_store["last_sunrise_time"] = dt_util.utcnow().isoformat()
+        self.data_store["entry_id"] = self.entry.entry_id
 
         self.hass.async_create_task(self._store.async_save(self.data_store))
 
