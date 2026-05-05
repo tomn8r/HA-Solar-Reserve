@@ -93,6 +93,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             # Diagnostic sensors
             "energy_available_kwh": 0.0,
             "energy_required_kwh": 0.0,
+            "solar_counted_kwh": 0.0,
             "resolved_battery_capacity_kwh": 10.0,
             "managed_load_usage_kwh": 0.0,
             "night_data_days": 0,
@@ -374,15 +375,21 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             
         solar_tomorrow = self._safe_float(self._get_config(CONF_SOLAR_TOMORROW), default=0.0)
 
-        energy_available = current_battery + solar_today
-        self.calculated_data["energy_available_kwh"] = round(energy_available, 2)
-
         avg_night_load = self.calculated_data["avg_night_load"]
         avg_day_load = self.calculated_data["avg_day_load"]
 
         # --- Dynamic expected load (shrinks through the night as house uses energy) ---
         sun_state = self.hass.states.get("sun.sun")
         is_night = sun_state is not None and sun_state.state == "below_horizon"
+
+        # After midnight and before sunrise the solar forecast sensor resets to the
+        # full day's expected generation, but none of that energy is available yet.
+        # Only count solar_today when the sun is above the horizon.
+        solar_available_now = 0.0 if is_night else solar_today
+
+        energy_available = current_battery + solar_available_now
+        self.calculated_data["energy_available_kwh"] = round(energy_available, 2)
+        self.calculated_data["solar_counted_kwh"] = round(solar_available_now, 2)
 
         now = dt_util.utcnow()
 

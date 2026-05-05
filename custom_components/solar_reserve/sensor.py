@@ -34,6 +34,7 @@ async def async_setup_entry(
         CalculatedSurplus(coordinator, entry),
         EnergyAvailable(coordinator, entry),
         EnergyRequired(coordinator, entry),
+        SolarCountedToday(coordinator, entry),
         # --- Warm-up progress ---
         NightDataDaysCollected(coordinator, entry),
         DayDataDaysCollected(coordinator, entry),
@@ -244,6 +245,38 @@ class EnergyRequired(_SolarReserveSensorBase):
         return {
             "dynamic_expected_load_kwh": round(load, 2) if load is not None else None,
             "tomorrow_deficit_kwh": round(deficit, 2) if deficit is not None else None,
+        }
+
+
+class SolarCountedToday(_SolarReserveSensorBase):
+    """Solar energy counted towards Energy Available right now.
+
+    During the day this mirrors the solar forecast sensor (remaining solar today).
+    At night it is zero: the forecast resets to the full day's expected generation
+    after midnight, but that energy has not been produced yet and must not be
+    counted as available until the sun rises.
+    """
+
+    def __init__(self, coordinator, entry):
+        super().__init__(coordinator, entry)
+        self._attr_name = "Solar Counted Today"
+        self._attr_unique_id = f"{entry.entry_id}_solar_counted_today"
+        self._attr_device_class = SensorDeviceClass.ENERGY
+        self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_icon = "mdi:solar-power"
+
+    @property
+    def native_value(self):
+        val = self.coordinator.data.get("solar_counted_kwh", 0.0)
+        return round(val, 2) if val is not None else None
+
+    @property
+    def extra_state_attributes(self):
+        data = self.coordinator.data or {}
+        raw = data.get("raw_solar_today", 0.0)
+        return {
+            "raw_solar_forecast_kwh": round(raw, 2) if raw is not None else None,
         }
 
 
