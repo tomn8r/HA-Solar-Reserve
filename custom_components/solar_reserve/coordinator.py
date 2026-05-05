@@ -71,6 +71,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             "daily_day_loads": [],
             "last_sunset_time": None,
             "last_sunrise_time": None,
+            # False only on a fresh install/reinstall when recorder seeding failed.
+            # Defaults to True so existing upgrades don't re-trigger seeding.
+            "snapshots_seeded": True,
         }
 
         # In-memory only: rolling max values for meter-reset detection
@@ -114,6 +117,173 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         """Get config from options first, then data."""
         return self.entry.options.get(key, self.entry.data.get(key, default))
 
+    async def _async_seed_from_recorder(self) -> bool:
+        """Attempt to seed snapshots and rolling averages from HA recorder history.
+
+        Queries sun.sun transitions to locate actual sunrise/sunset timestamps, then
+        reads the energy sensors at those moments.  Also reconstructs up to 7 days of
+        overnight/daytime load history for the rolling averages.
+
+        Returns True when meaningful data was obtained; False when the recorder is
+        unavailable, not yet ready, or has no relevant history (e.g. new install).
+        The caller should fall back to deferred live-value seeding in that case.
+        """
+        try:
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder.history import (  # noqa: PLC0415
+                get_significant_states,
+            )
+            instance = get_instance(self.hass)
+        except Exception:  # recorder not installed / not yet ready
+            _LOGGER.debug("Solar Reserve: recorder unavailable, skipping historical seed")
+            return False
+
+        now = dt_util.utcnow()
+        start_time = now - datetime.timedelta(days=9)
+
+        home_entity = self._get_config(CONF_TOTAL_HOME_ENERGY)
+        load_entity = self._get_config(CONF_LOAD_ENERGY)
+        entities = ["sun.sun"]
+        if home_entity:
+            entities.append(home_entity)
+        if load_entity:
+            entities.append(load_entity)
+
+        try:
+            states_dict: dict = await instance.async_add_executor_job(
+                get_significant_states,
+                self.hass,
+                start_time,
+                now,
+                entities,
+                None,   # filters
+                True,   # include_start_time_state
+                False,  # significant_changes_only — capture all energy readings
+            )
+        except Exception as err:
+            _LOGGER.debug("Solar Reserve: recorder query failed: %s", err)
+            return False
+
+        sun_states = states_dict.get("sun.sun", [])
+        if len(sun_states) < 2:
+            _LOGGER.debug("Solar Reserve: insufficient sun.sun history in recorder")
+            return False
+
+        # --- Locate sunrise / sunset transition timestamps ---
+        sunrise_times: list = []
+        sunset_times: list = []
+        for i in range(1, len(sun_states)):
+            prev, curr = sun_states[i - 1], sun_states[i]
+            if prev.state == "below_horizon" and curr.state == "above_horizon":
+                sunrise_times.append(curr.last_changed)
+            elif prev.state == "above_horizon" and curr.state == "below_horizon":
+                sunset_times.append(curr.last_changed)
+
+        if not sunrise_times and not sunset_times:
+            _LOGGER.debug("Solar Reserve: no sunrise/sunset transitions found in recorder")
+            return False
+
+        home_states = states_dict.get(home_entity, []) if home_entity else []
+        load_states = states_dict.get(load_entity, []) if load_entity else []
+
+        def _unit(entity_id: str) -> str:
+            live = self.hass.states.get(entity_id)
+            return live.attributes.get("unit_of_measurement", "") if live else ""
+
+        def _value_at(states_list, target_time, entity_id):
+            """Return the sensor kWh value at or just before target_time."""
+            candidates = [s for s in states_list if s.last_changed <= target_time]
+            if not candidates:
+                return None
+            s = candidates[-1]
+            if s.state in (None, "unknown", "unavailable"):
+                return None
+            try:
+                val = float(s.state)
+                unit = _unit(entity_id)
+                if unit == "Wh":
+                    val /= 1000.0
+                elif unit == "MWh":
+                    val *= 1000.0
+                return val
+            except (ValueError, TypeError):
+                return None
+
+        # --- Seed most-recent sunrise / sunset snapshots ---
+        seeded_any = False
+        if sunrise_times:
+            t = sunrise_times[-1]
+            hv = _value_at(home_states, t, home_entity) if home_entity else None
+            lv = _value_at(load_states, t, load_entity) if load_entity else None
+            if hv is not None:
+                self.data_store["sunrise_energy"] = hv
+                self.data_store["last_sunrise_time"] = t.isoformat()
+                seeded_any = True
+            if lv is not None:
+                self.data_store["sunrise_ac_energy"] = lv
+
+        if sunset_times:
+            t = sunset_times[-1]
+            hv = _value_at(home_states, t, home_entity) if home_entity else None
+            lv = _value_at(load_states, t, load_entity) if load_entity else None
+            if hv is not None:
+                self.data_store["sunset_energy"] = hv
+                self.data_store["last_sunset_time"] = t.isoformat()
+                seeded_any = True
+            if lv is not None:
+                self.data_store["sunset_ac_energy"] = lv
+
+        if not seeded_any:
+            _LOGGER.debug("Solar Reserve: recorder had transitions but no energy sensor values")
+            return False
+
+        # --- Reconstruct rolling load averages from historical periods ---
+        all_sunrises = sorted(sunrise_times)
+        all_sunsets = sorted(sunset_times)
+
+        day_loads: list[float] = []
+        for sr in all_sunrises:
+            next_ss = next((t for t in all_sunsets if t > sr), None)
+            if next_ss is None:
+                continue
+            h0 = _value_at(home_states, sr, home_entity) if home_entity else None
+            h1 = _value_at(home_states, next_ss, home_entity) if home_entity else None
+            l0 = _value_at(load_states, sr, load_entity) if load_entity else 0.0
+            l1 = _value_at(load_states, next_ss, load_entity) if load_entity else 0.0
+            if h0 is not None and h1 is not None and h1 > h0:
+                day_loads.append(max(0.0, (h1 - h0) - ((l1 or 0.0) - (l0 or 0.0))))
+
+        night_loads: list[float] = []
+        for ss in all_sunsets:
+            next_sr = next((t for t in all_sunrises if t > ss), None)
+            if next_sr is None:
+                continue
+            h0 = _value_at(home_states, ss, home_entity) if home_entity else None
+            h1 = _value_at(home_states, next_sr, home_entity) if home_entity else None
+            l0 = _value_at(load_states, ss, load_entity) if load_entity else 0.0
+            l1 = _value_at(load_states, next_sr, load_entity) if load_entity else 0.0
+            if h0 is not None and h1 is not None and h1 > h0:
+                night_loads.append(max(0.0, (h1 - h0) - ((l1 or 0.0) - (l0 or 0.0))))
+
+        if day_loads:
+            self.data_store["daily_day_loads"] = day_loads[-7:]
+        if night_loads:
+            self.data_store["daily_loads"] = night_loads[-7:]
+
+        _LOGGER.info(
+            "Solar Reserve: seeded from recorder — "
+            "sunrise_energy=%.3f kWh, sunset_energy=%.3f kWh, "
+            "sunrise_ac=%.3f kWh, sunset_ac=%.3f kWh, "
+            "night_days=%d, day_days=%d",
+            self.data_store.get("sunrise_energy", 0),
+            self.data_store.get("sunset_energy", 0),
+            self.data_store.get("sunrise_ac_energy", 0),
+            self.data_store.get("sunset_ac_energy", 0),
+            len(night_loads),
+            len(day_loads),
+        )
+        return True
+
     async def async_initialize(self):
         """Load stored data and setup listeners."""
         stored = await self._store.async_load()
@@ -125,23 +295,24 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         if stored and stored.get("entry_id") == self.entry.entry_id:
             self.data_store.update(stored)
         else:
-            # First run (or reinstall): seed snapshot values from live sensor
-            # readings NOW so the baseline is correct from the start.
-            home_entity = self._get_config(CONF_TOTAL_HOME_ENERGY)
-            load_entity = self._get_config(CONF_LOAD_ENERGY)
-            current_home = self._safe_float(home_entity) if home_entity else 0.0
-            current_load = self._safe_float(load_entity) if load_entity else 0.0
-            # Seed both sunset and sunrise snapshots to current reading
-            self.data_store["sunset_energy"] = current_home
-            self.data_store["sunrise_energy"] = current_home
-            self.data_store["sunset_ac_energy"] = current_load
-            self.data_store["sunrise_ac_energy"] = current_load
+            # First run or reinstall: try to seed from recorder history so that
+            # snapshots are based on actual sunrise/sunset values and rolling averages
+            # are pre-populated.  If the recorder is unavailable or has no relevant
+            # history, set snapshots_seeded=False so _recalculate() will seed from
+            # the live sensor values the first time they are available (deferred
+            # seeding avoids the startup race where sensors are still 'unknown').
             reason = "reinstall detected" if stored else "first run detected"
-            _LOGGER.info(
-                "HA Solar Reserve: %s. Seeding snapshots to current "
-                "sensor values (home=%.3f kWh, managed_load=%.3f kWh)",
-                reason, current_home, current_load,
-            )
+            seeded = await self._async_seed_from_recorder()
+            if seeded:
+                self.data_store["snapshots_seeded"] = True
+                _LOGGER.info("Solar Reserve: %s — seeded from recorder history", reason)
+            else:
+                self.data_store["snapshots_seeded"] = False
+                _LOGGER.info(
+                    "Solar Reserve: %s — recorder unavailable or no history; "
+                    "will seed snapshots from live sensor values on first valid reading",
+                    reason,
+                )
 
         if not self.data_store.get("last_sunset_time"):
             self.data_store["last_sunset_time"] = dt_util.utcnow().isoformat()
@@ -348,6 +519,36 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
 
     def _recalculate(self):
         """Perform the main surplus calculation."""
+        # --- Deferred snapshot seeding ---
+        # On a fresh install/reinstall where the recorder was unavailable, sensors
+        # may have been 'unknown' at startup.  Seed from the first valid live reading
+        # rather than from a 0.0 placeholder, which would inflate usage figures.
+        if not self.data_store.get("snapshots_seeded", True):
+            home_entity = self._get_config(CONF_TOTAL_HOME_ENERGY)
+            load_entity = self._get_config(CONF_LOAD_ENERGY)
+            home_state = self.hass.states.get(home_entity) if home_entity else None
+            if home_state and home_state.state not in (None, "unknown", "unavailable"):
+                hv = self._safe_float(home_entity)
+                lv = self._safe_float(load_entity) if load_entity else 0.0
+                self.data_store["sunrise_energy"] = hv
+                self.data_store["sunset_energy"] = hv
+                self.data_store["sunrise_ac_energy"] = lv
+                self.data_store["sunset_ac_energy"] = lv
+                self.data_store["snapshots_seeded"] = True
+                self._session_max["max_energy_since_sunset"] = hv
+                self._session_max["max_ac_energy_since_sunset"] = lv
+                self._session_max["max_energy_since_sunrise"] = hv
+                self._session_max["max_ac_energy_since_sunrise"] = lv
+                _LOGGER.info(
+                    "Solar Reserve: deferred seeding complete "
+                    "(home=%.3f kWh, managed_load=%.3f kWh)", hv, lv
+                )
+                self.hass.async_create_task(
+                    self._store.async_save(
+                        {**self.data_store, "entry_id": self.entry.entry_id}
+                    )
+                )
+
         # --- Capacity: Entity sensor > Manual number > Legacy v1.0.0 fallback ---
         cap_ent = self._get_config(CONF_BATTERY_CAPACITY_ENTITY)
         cap_man = self._get_config(CONF_BATTERY_CAPACITY_MANUAL)
