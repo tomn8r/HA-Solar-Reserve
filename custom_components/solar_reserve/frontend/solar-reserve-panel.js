@@ -26,9 +26,7 @@ class SolarReservePanel extends HTMLElement {
           font-family: var(--paper-font-body1_-_font-family), -apple-system, Roboto, sans-serif;
           background: var(--primary-background-color);
           color: var(--primary-text-color);
-          min-height: 100vh;
           box-sizing: border-box;
-          overflow-y: auto;
         }
         * { box-sizing: border-box; }
 
@@ -274,13 +272,54 @@ class SolarReservePanel extends HTMLElement {
         /* ── Active/inactive load segment labels ───────────────────────── */
         .segment-active   { font-weight: 600; color: var(--primary-text-color); }
         .segment-inactive { color: var(--secondary-text-color); }
+
+        /* ── CSV Export controls ─────────────────────────────────────────── */
+        .export-controls {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .export-select {
+          background: var(--ha-card-background, var(--card-background-color, #fff));
+          color: var(--primary-text-color);
+          border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+          border-radius: 8px;
+          padding: 7px 12px;
+          font-size: 0.9rem;
+          cursor: pointer;
+        }
+        .export-btn {
+          background: var(--primary-color, #03a9f4);
+          color: var(--text-primary-color, #fff);
+          border: none;
+          border-radius: 8px;
+          padding: 8px 16px;
+          cursor: pointer;
+          font-size: 0.9rem;
+          font-weight: 500;
+          white-space: nowrap;
+        }
+        .export-btn:hover { opacity: 0.85; }
+        .export-btn:disabled { opacity: 0.5; cursor: wait; }
       </style>
 
       <div class="dashboard-container">
         <!-- Header -->
-        <div class="header" style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap;">
+        <div class="header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
           <h1>HA Solar Reserve Analytics</h1>
-          <a href="/config/integrations/integration/solar_reserve" class="config-link">⚙ Configure Integration</a>
+          <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <a href="/config/integrations/integration/solar_reserve" class="config-link">⚙ Configure Integration</a>
+            <div class="export-controls">
+              <select id="export-range" class="export-select" title="Select export time range">
+                <option value="snapshot">Current Snapshot</option>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="all">All History</option>
+              </select>
+              <button id="export-btn" class="export-btn">⬇ Export CSV</button>
+            </div>
+          </div>
         </div>
 
         <!-- Warmup Banner (hidden until data available) -->
@@ -508,6 +547,11 @@ class SolarReservePanel extends HTMLElement {
       </div>
     `;
     this.content = true;
+
+    const exportBtn = this.shadowRoot.getElementById('export-btn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => this._handleExport());
+    }
   }
 
   updateData() {
@@ -781,6 +825,174 @@ class SolarReservePanel extends HTMLElement {
       setText('managed-load', fw(data.managed.state, 3));
       bindEntity('managed-load', data.managed, 'Energy consumed by the managed load sensor since the last sunrise/sunset snapshot.');
     }
+  }
+
+  async _handleExport() {
+    const btn    = this.shadowRoot.getElementById('export-btn');
+    const select = this.shadowRoot.getElementById('export-range');
+    if (!btn || !select) return;
+
+    btn.disabled    = true;
+    btn.textContent = '⏳ Exporting…';
+
+    try {
+      const val = select.value;
+      if (val === 'snapshot') {
+        this._exportSnapshot();
+      } else {
+        const hours = val === '24h' ? 24 : val === '7d' ? 168 : null;
+        await this._exportHistory(hours);
+      }
+    } catch (e) {
+      console.error('Solar Reserve CSV export error:', e);
+      alert('Export failed. See browser console for details.');
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '⬇ Export CSV';
+    }
+  }
+
+  _exportSnapshot() {
+    const states = this._hass.states;
+    const ts     = new Date().toISOString();
+    const rows   = [];
+
+    rows.push(['# Solar Reserve — Current Snapshot', ts]);
+    rows.push([]);
+
+    // ── All entity states ──────────────────────────────────────────────────
+    rows.push(['# Sensor States']);
+    rows.push(['entity_id', 'display_name', 'state', 'unit_of_measurement', 'last_changed']);
+    for (const [entityId, stateObj] of Object.entries(states)) {
+      if (!entityId.includes('solar_reserve')) continue;
+      rows.push([
+        entityId,
+        stateObj.attributes.friendly_name || entityId,
+        stateObj.state,
+        stateObj.attributes.unit_of_measurement || '',
+        stateObj.last_changed,
+      ]);
+    }
+
+    rows.push([]);
+
+    // ── Permission sensor attributes (inputs + computed values) ───────────
+    const permEntry = Object.entries(states).find(([id]) =>
+      id.includes('solar_reserve') && id.includes('permission'));
+    if (permEntry) {
+      rows.push(['# Permission Sensor Attributes (Inputs & Computed Values)']);
+      rows.push(['attribute', 'value']);
+      for (const [k, v] of Object.entries(permEntry[1].attributes)) {
+        rows.push([k, v !== null && v !== undefined ? String(v) : '']);
+      }
+      rows.push([]);
+    }
+
+    // ── Load tracker attributes ────────────────────────────────────────────
+    const trackers = Object.entries(states).filter(([id]) =>
+      id.includes('solar_reserve') && (id.includes('load_tracker')));
+    for (const [entityId, stateObj] of trackers) {
+      if (Object.keys(stateObj.attributes).length > 1) {
+        rows.push([`# Attributes: ${stateObj.attributes.friendly_name || entityId}`]);
+        rows.push(['attribute', 'value']);
+        for (const [k, v] of Object.entries(stateObj.attributes)) {
+          rows.push([k, v !== null && v !== undefined ? String(v) : '']);
+        }
+        rows.push([]);
+      }
+    }
+
+    const filename = `solar-reserve-snapshot-${ts.slice(0, 19).replace(/[:.]/g, '-')}.csv`;
+    this._downloadCSV(rows, filename);
+  }
+
+  async _exportHistory(hours) {
+    const states    = this._hass.states;
+    const entityIds = Object.keys(states).filter(id => id.includes('solar_reserve'));
+
+    if (entityIds.length === 0) {
+      alert('No Solar Reserve entities found.');
+      return;
+    }
+
+    const now   = new Date();
+    const start = hours ? new Date(now - hours * 3600 * 1000) : new Date('2000-01-01T00:00:00Z');
+    const url   = `/api/history/period/${start.toISOString()}` +
+                  `?filter_entity_id=${entityIds.join(',')}` +
+                  `&minimal_response=false` +
+                  `&significant_changes_only=false`;
+
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${this._hass.auth.data.access_token}` },
+    });
+    if (!resp.ok) throw new Error(`History API returned ${resp.status}`);
+
+    const history = await resp.json();
+    const ts      = now.toISOString();
+    const label   = hours === 24 ? '24h' : hours === 168 ? '7d' : 'all';
+    const rows    = [];
+
+    rows.push(['# Solar Reserve — History Export', label, ts]);
+    rows.push([]);
+
+    // ── Current snapshot header for reference ─────────────────────────────
+    rows.push(['# Current Input Snapshot (for reference)']);
+    rows.push(['entity_id', 'state', 'unit_of_measurement']);
+    for (const [entityId, stateObj] of Object.entries(states)) {
+      if (!entityId.includes('solar_reserve')) continue;
+      rows.push([
+        entityId,
+        stateObj.state,
+        stateObj.attributes.unit_of_measurement || '',
+      ]);
+    }
+    rows.push([]);
+
+    // ── Permission sensor attributes snapshot ─────────────────────────────
+    const permEntry = Object.entries(states).find(([id]) =>
+      id.includes('solar_reserve') && id.includes('permission'));
+    if (permEntry) {
+      rows.push(['# Current Permission Sensor Attributes']);
+      rows.push(['attribute', 'value']);
+      for (const [k, v] of Object.entries(permEntry[1].attributes)) {
+        rows.push([k, v !== null && v !== undefined ? String(v) : '']);
+      }
+      rows.push([]);
+    }
+
+    // ── Historical time-series ─────────────────────────────────────────────
+    rows.push(['# Historical Data']);
+    rows.push(['timestamp', 'entity_id', 'display_name', 'state', 'unit_of_measurement']);
+    for (const entityHistory of history) {
+      for (const stateObj of entityHistory) {
+        rows.push([
+          stateObj.last_changed,
+          stateObj.entity_id,
+          stateObj.attributes?.friendly_name || stateObj.entity_id,
+          stateObj.state,
+          stateObj.attributes?.unit_of_measurement || '',
+        ]);
+      }
+    }
+
+    this._downloadCSV(rows, `solar-reserve-history-${label}-${ts.slice(0, 10)}.csv`);
+  }
+
+  _downloadCSV(rows, filename) {
+    const escape = v => {
+      const s = String(v);
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? '"' + s.replace(/"/g, '""') + '"'
+        : s;
+    };
+    const csv  = rows.map(r => Array.isArray(r) ? r.map(escape).join(',') : '').join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }
 
