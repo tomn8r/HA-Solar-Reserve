@@ -8,12 +8,12 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, NAME
+from .coordinator import SolarReserveCoordinator
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
     from .__init__ import SolarReserveConfigEntry
-    from .coordinator import SolarReserveCoordinator
 
 
 async def async_setup_entry(
