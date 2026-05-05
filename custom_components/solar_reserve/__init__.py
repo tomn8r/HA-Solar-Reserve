@@ -37,7 +37,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: SolarReserveConfigEntry)
             sidebar_title="Solar Reserve",
             sidebar_icon="mdi:solar-power",
             frontend_url_path="solar-reserve",
-            require_admin=True,
+            require_admin=False,
             config={
                 "_panel_custom": {
                     "name": "solar-reserve-panel",
