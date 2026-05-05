@@ -545,7 +545,7 @@ class SolarReservePanel extends HTMLElement {
     const setText = (id, text, isLoading = false) => {
       const el = this.shadowRoot.getElementById(id);
       if (!el) return;
-      el.innerText = text;
+      el.textContent = text;
       el.classList.toggle('loading', isLoading);
     };
 
@@ -639,8 +639,8 @@ class SolarReservePanel extends HTMLElement {
       const phaseEl = this.shadowRoot.getElementById('sun-phase');
       if (phaseEl) {
         phaseEl.innerHTML = isNight
-          ? '<span class="phase-badge phase-night">🌙 Night</span>'
-          : '<span class="phase-badge phase-day">☀️ Daytime</span>';
+          ? '<span class="phase-badge phase-night" aria-label="Night phase">🌙 Night</span>'
+          : '<span class="phase-badge phase-day" aria-label="Daytime phase">☀️ Daytime</span>';
       }
 
       // Active/inactive load segment labels
