@@ -16,9 +16,11 @@ CONF_BATTERY_CAPACITY_MANUAL = "battery_capacity_manual"
 CONF_EMERGENCY_RESERVE_PERCENT = "emergency_reserve_percent"
 CONF_LOAD_ENERGY = "load_energy"
 CONF_MORNING_BUFFER_HOURS = "morning_buffer_hours"
+CONF_MAX_PERIOD_LOAD = "max_period_load_kwh"
 
 # Defaults
 DEFAULT_AVG_NIGHT_LOAD = 10.0
 DEFAULT_AVG_DAY_LOAD = 10.0
 DEFAULT_MORNING_BUFFER_HOURS = 1.5
 DEFAULT_APPLIANCE_POWER_KW = 3.0  # Assumed managed load draw for runtime estimation
+DEFAULT_MAX_PERIOD_LOAD = 150.0  # kWh: max plausible home draw in a single day/night period

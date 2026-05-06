@@ -493,7 +493,7 @@ class SolarReservePanel extends HTMLElement {
             <div class="energy-formula">
               <div class="formula-item" id="exp-load-item">
                 <div class="formula-icon">📊</div>
-                <div class="formula-label">Expected Load</div>
+                <div class="formula-label">Today's Load</div>
                 <div id="exp-load" class="formula-value">—</div>
                 <div class="formula-unit">kWh</div>
               </div>
@@ -890,13 +890,13 @@ class SolarReservePanel extends HTMLElement {
     // ── Surplus equation strip ────────────────────────────────────────────
     if (data.available && data.required) {
       const avail = parseFloat(data.available.state);
-      const req   = parseFloat(data.required.state);
-      const surp  = avail - req;
-      const eqAvail  = this.shadowRoot.getElementById('eq-available');
-      const eqReq    = this.shadowRoot.getElementById('eq-required');
-      const eqSurp   = this.shadowRoot.getElementById('eq-surplus');
+      const req = parseFloat(data.required.state);
+      const surp = avail - req;
+      const eqAvail = this.shadowRoot.getElementById('eq-available');
+      const eqReq = this.shadowRoot.getElementById('eq-required');
+      const eqSurp = this.shadowRoot.getElementById('eq-surplus');
       if (eqAvail) eqAvail.textContent = avail.toFixed(2);
-      if (eqReq)   eqReq.textContent   = req.toFixed(2);
+      if (eqReq) eqReq.textContent = req.toFixed(2);
       if (eqSurp) {
         eqSurp.textContent = (surp >= 0 ? '+' : '') + surp.toFixed(2);
         eqSurp.className = surp >= 0 ? 'eq-val eq-result-pos' : 'eq-val eq-result-neg';

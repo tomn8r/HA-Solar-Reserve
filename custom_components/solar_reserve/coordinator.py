@@ -24,10 +24,12 @@ from .const import (
     CONF_EMERGENCY_RESERVE_PERCENT,
     CONF_LOAD_ENERGY,
     CONF_MORNING_BUFFER_HOURS,
+    CONF_MAX_PERIOD_LOAD,
     DEFAULT_AVG_NIGHT_LOAD,
     DEFAULT_AVG_DAY_LOAD,
     DEFAULT_APPLIANCE_POWER_KW,
     DEFAULT_MORNING_BUFFER_HOURS,
+    DEFAULT_MAX_PERIOD_LOAD,
 )
 
 if TYPE_CHECKING:
@@ -421,6 +423,21 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         current_val = self._safe_float(entity_id)
         start_val = self.data_store.get(start_key, current_val)
 
+        # --- Layer 2: Zero-snapshot guard ---
+        # If start_val is 0.0 but current_val is enormous, the snapshot was almost
+        # certainly never seeded (e.g. after a restart before the first sunrise/sunset).
+        # Returning the raw delta would inject a value equal to the meter's entire
+        # lifetime reading into the rolling average.
+        max_load = float(self._get_config(CONF_MAX_PERIOD_LOAD, DEFAULT_MAX_PERIOD_LOAD))
+        if start_val == 0.0 and current_val > max_load:
+            _LOGGER.warning(
+                "Solar Reserve: Zero-snapshot guard triggered for %s "
+                "(current=%.1f kWh exceeds max_period_load=%.1f kWh with start=0.0). "
+                "Snapshot likely lost after restart — returning 0.0 to avoid corrupt delta.",
+                entity_id, current_val, max_load,
+            )
+            return 0.0
+
         # Update in-memory max ONLY (not persisted data_store)
         current_max = self._session_max.get(max_key, start_val)
         if current_val > current_max:
@@ -446,11 +463,24 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         self.data_store["daytime_load_tracker"] = true_day_load
         self.calculated_data["daytime_load_tracker"] = true_day_load
 
+        # --- Layer 1: Configurable plausibility clamp ---
+        # Only append to the rolling average when the delta is realistic.
+        # A corrupted zero-start snapshot can produce values equal to the meter's
+        # entire lifetime reading; we protect the 7-day average from such spikes.
+        max_load = float(self._get_config(CONF_MAX_PERIOD_LOAD, DEFAULT_MAX_PERIOD_LOAD))
         loads = self.data_store.get("daily_day_loads", [])
-        loads.append(true_day_load)
-        if len(loads) > 7:
-            loads.pop(0)
-        self.data_store["daily_day_loads"] = loads
+        if true_day_load > max_load:
+            _LOGGER.warning(
+                "Solar Reserve: Daytime load %.2f kWh exceeds max_period_load %.1f kWh — "
+                "skipping rolling average update to protect historical data. "
+                "Check snapshot integrity or raise max_period_load_kwh in options.",
+                true_day_load, max_load,
+            )
+        else:
+            loads.append(true_day_load)
+            if len(loads) > 7:
+                loads.pop(0)
+            self.data_store["daily_day_loads"] = loads
         self._recalc_average()
 
         # Take sunset snapshot
@@ -482,11 +512,21 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         self.data_store["overnight_load_tracker"] = true_night_load
         self.calculated_data["overnight_load_tracker"] = true_night_load
 
+        # --- Layer 1: Configurable plausibility clamp ---
+        max_load = float(self._get_config(CONF_MAX_PERIOD_LOAD, DEFAULT_MAX_PERIOD_LOAD))
         loads = self.data_store.get("daily_loads", [])
-        loads.append(true_night_load)
-        if len(loads) > 7:
-            loads.pop(0)
-        self.data_store["daily_loads"] = loads
+        if true_night_load > max_load:
+            _LOGGER.warning(
+                "Solar Reserve: Overnight load %.2f kWh exceeds max_period_load %.1f kWh — "
+                "skipping rolling average update to protect historical data. "
+                "Check snapshot integrity or raise max_period_load_kwh in options.",
+                true_night_load, max_load,
+            )
+        else:
+            loads.append(true_night_load)
+            if len(loads) > 7:
+                loads.pop(0)
+            self.data_store["daily_loads"] = loads
         self._recalc_average()
 
         # Take sunrise snapshot
@@ -506,13 +546,47 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         self.hass.async_create_task(self._store.async_save(self.data_store))
 
     def _recalc_average(self):
-        """Recalculate the 7-day rolling averages."""
+        """Recalculate the 7-day rolling averages, filtering statistical outliers."""
+
+        def _median(lst):
+            s = sorted(lst)
+            n = len(s)
+            return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
         night_loads = self.data_store.get("daily_loads", [])
+        if len(night_loads) > 1:
+            med = _median(night_loads)
+            # Layer 3: Discard values more than 3× the median (outliers from sensor errors).
+            # The floor prevents filtering when the median itself is near zero.
+            threshold = max(med * 3.0, DEFAULT_AVG_NIGHT_LOAD * 2)
+            filtered_night = [l for l in night_loads if l <= threshold]
+            if len(filtered_night) < len(night_loads):
+                _LOGGER.warning(
+                    "Solar Reserve: %d night-load outlier(s) excluded from average (threshold=%.1f kWh). "
+                    "Raw values: %s",
+                    len(night_loads) - len(filtered_night),
+                    threshold,
+                    [round(v, 2) for v in night_loads],
+                )
+            night_loads = filtered_night or night_loads  # fall back if all were filtered
         self.calculated_data["avg_night_load"] = (
             sum(night_loads) / len(night_loads) if night_loads else DEFAULT_AVG_NIGHT_LOAD
         )
 
         day_loads = self.data_store.get("daily_day_loads", [])
+        if len(day_loads) > 1:
+            med = _median(day_loads)
+            threshold = max(med * 3.0, DEFAULT_AVG_DAY_LOAD * 2)
+            filtered_day = [l for l in day_loads if l <= threshold]
+            if len(filtered_day) < len(day_loads):
+                _LOGGER.warning(
+                    "Solar Reserve: %d day-load outlier(s) excluded from average (threshold=%.1f kWh). "
+                    "Raw values: %s",
+                    len(day_loads) - len(filtered_day),
+                    threshold,
+                    [round(v, 2) for v in day_loads],
+                )
+            day_loads = filtered_day or day_loads
         self.calculated_data["avg_day_load"] = (
             sum(day_loads) / len(day_loads) if day_loads else DEFAULT_AVG_DAY_LOAD
         )
