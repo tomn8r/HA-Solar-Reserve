@@ -778,7 +778,10 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
 
         # --- 36-Hour deficit engine ---
         tomorrow_expected_usage = avg_day_load + avg_night_load
-        tomorrow_deficit = max(0.0, tomorrow_expected_usage - solar_tomorrow)
+        # morning_buffer_kwh is already explicitly reserved in load_expected above.
+        # Deduct it here so the morning dead-zone is not counted a second time
+        # when tomorrow's solar underperforms (i.e. when deficit > 0).
+        tomorrow_deficit = max(0.0, tomorrow_expected_usage - morning_buffer_kwh - solar_tomorrow)
         self.calculated_data["tomorrow_deficit"] = tomorrow_deficit
 
         emergency_pct = float(self._get_config(CONF_EMERGENCY_RESERVE_PERCENT, 0))

@@ -492,8 +492,8 @@ class SolarReservePanel extends HTMLElement {
             <div class="card-header">Energy Required</div>
             <div class="energy-formula">
               <div class="formula-item" id="exp-load-item">
-                <div class="formula-icon">📊</div>
-                <div class="formula-label">Today's Load</div>
+                <div class="formula-icon" id="exp-load-icon">🌤️</div>
+                <div class="formula-label" id="exp-load-label">Day + Tonight</div>
                 <div id="exp-load" class="formula-value">—</div>
                 <div class="formula-unit">kWh</div>
               </div>
@@ -525,29 +525,41 @@ class SolarReservePanel extends HTMLElement {
         <!-- Today's Load & Tomorrow's Load -->
         <div class="grid-2">
           <div class="card">
-            <div class="card-header">Today's Load</div>
-            <div class="metric-row">
-              <span id="dyn-day-label">Rest of Day Target</span>
+            <div class="card-header">Today's Remaining Load</div>
+            <div class="metric-row" id="dyn-day-row">
+              <span id="dyn-day-label">Remaining Day Load</span>
               <span id="dyn-day" class="value">-</span>
             </div>
             <div class="metric-row">
-              <span id="dyn-night-label">Rest of Night Target</span>
+              <span id="dyn-night-label">Remaining Night Load</span>
               <span id="dyn-night" class="value">-</span>
             </div>
             <div class="metric-row">
               <span>Morning Buffer</span>
               <span id="dyn-buffer" class="value">-</span>
             </div>
+            <div class="metric-row total-row">
+              <span>= Expected Load</span>
+              <span id="dyn-total" class="value">-</span>
+            </div>
           </div>
           <div class="card">
-            <div class="card-header">Tomorrow's Load</div>
+            <div class="card-header">Tomorrow's Deficit / Surplus</div>
             <div class="metric-row">
-              <span>Expected Usage (Day+Night)</span>
+              <span>Expected Usage (Tomorrow Day + Tomorrow Night)</span>
               <span id="tom-expected" class="value">-</span>
+            </div>
+            <div class="metric-row sub-row" id="tom-buffer-deduct-row">
+              <span>Less: Morning Buffer (reserved in Today's Load)</span>
+              <span id="tom-buffer-deduct" class="value">-</span>
             </div>
             <div class="metric-row">
               <span>Solar Forecast Tomorrow</span>
               <span id="solar-tom" class="value">-</span>
+            </div>
+            <div class="metric-row" id="tom-shortfall-row">
+              <span id="tom-shortfall-label">Shortfall (Deficit)</span>
+              <span id="tom-shortfall" class="value">-</span>
             </div>
           </div>
         </div>
@@ -799,24 +811,73 @@ class SolarReservePanel extends HTMLElement {
       setText('tom-deficit', fnum(attrs.tomorrow_deficit_kwh));
       setText('dyn-emerg', fnum(attrs.dyn_emergency_reserve_kwh));
 
-      // Today's Load & Tomorrow's Load cards — use fw (no separate unit element)
+      // Change 1: Phase-aware label + icon for the formula tile
+      const expLoadIcon = this.shadowRoot.getElementById('exp-load-icon');
+      const expLoadLabel = this.shadowRoot.getElementById('exp-load-label');
+      if (expLoadIcon) expLoadIcon.textContent = isNight ? '🌙' : '🌤️';
+      if (expLoadLabel) expLoadLabel.textContent = isNight ? 'Remaining Night' : 'Day + Tonight';
+
+      // Change 2: Load Allowance card — values + phase-aware row labels
       setText('dyn-day', fw(attrs.dyn_rest_of_day_kwh));
       setText('dyn-night', fw(attrs.dyn_rest_of_night_kwh));
       setText('dyn-buffer', fw(attrs.dyn_morning_buffer_kwh));
 
+      // Hide the daytime row at night (value is always 0 — noise not insight)
+      const dayRow = this.shadowRoot.getElementById('dyn-day-row');
+      if (dayRow) dayRow.style.display = isNight ? 'none' : '';
+
+      // Night row label reflects whether the full night is ahead or partially elapsed
+      const nightLabelEl = this.shadowRoot.getElementById('dyn-night-label');
+      if (nightLabelEl) nightLabelEl.textContent = isNight ? 'Remaining Night' : 'Full Night Ahead';
+
+      // Total row — sum of subcomponents, should match formula tile
+      const restOfDay = parseFloat(attrs.dyn_rest_of_day_kwh) || 0;
+      const restOfNight = parseFloat(attrs.dyn_rest_of_night_kwh) || 0;
+      const morningBuf = parseFloat(attrs.dyn_morning_buffer_kwh) || 0;
+      setText('dyn-total', fw(restOfDay + restOfNight + morningBuf));
+
+      // Tomorrow's Load card
       const eDay = parseFloat(attrs.avg_day_load_kwh) || 0;
       const eNight = parseFloat(attrs.avg_night_load_kwh) || 0;
       setText('tom-expected', fw(eDay + eNight));
+      // Deduction row: morning buffer already reserved in Today's Load card
+      setText('tom-buffer-deduct', morningBuf > 0 ? '−' + fw(morningBuf) : fw(0));
       setText('solar-tom', fw(attrs.raw_solar_tomorrow));
 
-      setTooltip('exp-load', 'Total dynamic load expected until the morning buffer finishes.');
-      setTooltip('dyn-day', 'Dynamic target to cover the rest of daytime usage.');
-      setTooltip('dyn-night', 'Dynamic target to cover overnight usage.');
-      setTooltip('dyn-buffer', 'Configured buffer to cover next morning before solar starts producing.');
-      setTooltip('tom-deficit', 'Expected 36-hour deficit, holding energy back if tomorrow is forecasted to be cloudy.');
-      setTooltip('tom-expected', 'Total expected usage tomorrow (day + night).');
-      setTooltip('solar-tom', 'Solar output forecast for tomorrow.');
-      setTooltip('dyn-emerg', 'Emergency reserve energy explicitly held back.');
+      // Change 3: Shortfall row — use coordinator's pre-computed value so it
+      // always matches the Tomorrow's Deficit formula tile exactly
+      const deficit = parseFloat(attrs.tomorrow_deficit_kwh) || 0;
+      const shortfallLabelEl = this.shadowRoot.getElementById('tom-shortfall-label');
+      const shortfallValEl = this.shadowRoot.getElementById('tom-shortfall');
+      if (shortfallLabelEl && shortfallValEl) {
+        if (deficit <= 0) {
+          shortfallLabelEl.textContent = '✓ Solar covers tomorrow';
+          shortfallLabelEl.style.color = 'var(--success-color, #4caf50)';
+          shortfallValEl.textContent = '0.00 kWh';
+          shortfallValEl.style.color = 'var(--success-color, #4caf50)';
+        } else {
+          shortfallLabelEl.textContent = '⚠ Shortfall (Deficit)';
+          shortfallLabelEl.style.color = 'var(--warning-color, #ff9800)';
+          shortfallValEl.textContent = deficit.toFixed(2) + ' kWh';
+          shortfallValEl.style.color = 'var(--warning-color, #ff9800)';
+        }
+      }
+
+      // Change 4: Phase-aware and accurate tooltips
+      setTooltip('exp-load', isNight
+        ? 'Energy the engine is reserving for the remainder of tonight, plus the morning buffer before solar generates.'
+        : 'Energy the engine is reserving for the remainder of today and tonight, plus the morning buffer before solar generates.');
+      setTooltip('dyn-day', 'Prorated daytime load remaining — scales down as the day progresses.');
+      setTooltip('dyn-night', isNight
+        ? 'Prorated remaining night load — scales down as the night progresses.'
+        : 'Full average night load held in reserve for tonight (sunset to next sunrise).');
+      setTooltip('dyn-buffer', 'Configured buffer to cover the morning dead-zone before solar starts generating.');
+      setTooltip('dyn-total', 'Sum of all load allowance components — matches the formula tile above.');
+      setTooltip('tom-deficit', 'Held in reserve today: tomorrow\'s net need (expected usage − morning buffer) minus solar forecast. Matches the Tomorrow\'s Deficit formula tile.');
+      setTooltip('tom-expected', 'Full expected home consumption tomorrow (avg daytime + avg overnight). The morning buffer is deducted on the next line to avoid double-counting with Today\'s Load.');
+      setTooltip('tom-buffer-deduct', 'The morning dead-zone is already reserved separately in Today\'s Load. Deducting it here ensures it is not counted twice in the deficit.');
+      setTooltip('solar-tom', 'Solar output forecast for all of tomorrow.');
+      setTooltip('dyn-emerg', 'Emergency reserve explicitly held back regardless of surplus.');
 
       // Bind liabilities formula items to Energy Required entity
       bindEntity('exp-load', data.required, 'Dynamic expected load for the current period.');
