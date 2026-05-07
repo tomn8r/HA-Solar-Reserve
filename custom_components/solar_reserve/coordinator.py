@@ -123,6 +123,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             "managed_load_peak_kw": 0.0,
             "net_battery_discharge_kw": 0.0,
             "battery_sustain_hours": 0.0,
+            "battery_can_sustain": True,
+            "current_solar_power_kw": 0.0,
+            "current_home_power_kw": 0.0,
         }
 
     def _get_config(self, key, default=None):
@@ -974,7 +977,10 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
                     battery_can_sustain = usable_battery >= net_discharge_kw * runway_hours
 
             # Export diagnostics
+            self.calculated_data["current_solar_power_kw"] = round(solar_power_kw, 3)
+            self.calculated_data["current_home_power_kw"] = round(home_power_kw, 3)
             self.calculated_data["net_battery_discharge_kw"] = round(net_discharge_kw, 3)
+            self.calculated_data["battery_can_sustain"] = battery_can_sustain
             self.calculated_data["battery_sustain_hours"] = (
                 round(max(0.0, current_battery - emergency_reserve) / net_discharge_kw, 2)
                 if net_discharge_kw > 0 else 999.0
@@ -982,7 +988,10 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         else:
             # Power sensors not configured — fall back to surplus check only.
             battery_can_sustain = True
+            self.calculated_data["current_solar_power_kw"] = 0.0
+            self.calculated_data["current_home_power_kw"] = 0.0
             self.calculated_data["net_battery_discharge_kw"] = 0.0
+            self.calculated_data["battery_can_sustain"] = True
             self.calculated_data["battery_sustain_hours"] = 0.0
 
         self.calculated_data["managed_load_peak_kw"] = round(managed_load_peak_kw, 3)

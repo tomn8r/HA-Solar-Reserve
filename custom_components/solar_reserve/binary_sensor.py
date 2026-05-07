@@ -84,4 +84,12 @@ class SolarReservePermission(CoordinatorEntity[SolarReserveCoordinator], BinaryS
             "dyn_rest_of_night_kwh": data.get("dyn_rest_of_night_kwh"),
             "dyn_morning_buffer_kwh": data.get("dyn_morning_buffer_kwh"),
             "dyn_emergency_reserve_kwh": data.get("dyn_emergency_reserve_kwh"),
+            # Battery sustain diagnostics
+            "managed_load_peak_kw": data.get("managed_load_peak_kw", 0.0),
+            "net_battery_discharge_kw": data.get("net_battery_discharge_kw", 0.0),
+            "battery_sustain_hours": data.get("battery_sustain_hours", 0.0),
+            "battery_can_sustain": data.get("battery_can_sustain", True),
+            "current_solar_power_kw": data.get("current_solar_power_kw", 0.0),
+            "current_home_power_kw": data.get("current_home_power_kw", 0.0),
         }
+

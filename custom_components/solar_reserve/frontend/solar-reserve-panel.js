@@ -402,6 +402,49 @@ class SolarReservePanel extends HTMLElement {
         }
         details[open].collapsible-card > summary::after { transform: rotate(180deg); }
         details.collapsible-card > .grid-2 { margin-top: 16px; }
+
+        /* ── Permission Condition pills ──────────────────────────────────────── */
+        .conditions-strip {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          padding: 12px 4px 4px;
+          margin-top: 8px;
+          border-top: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+        }
+        .cond-pill {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 14px 6px 10px;
+          border-radius: 20px;
+          font-size: 0.85rem;
+          font-weight: 500;
+          background: var(--secondary-background-color, rgba(128,128,128,0.07));
+          transition: background 0.2s;
+          flex: 1;
+          min-width: 180px;
+        }
+        .cond-pill.pass  { background: rgba(76,175,80,0.13);  color: var(--success-color, #4caf50); }
+        .cond-pill.fail  { background: rgba(244,67,54,0.12);  color: var(--error-color, #f44336); }
+        .cond-pill.na    { opacity: 0.55; }
+        .cond-icon { font-size: 1rem; flex-shrink: 0; }
+        .cond-label { flex: 1; }
+        .cond-val { font-size: 0.8rem; margin-left: 4px; white-space: nowrap; }
+
+        /* ── Battery Sustain analysis card ───────────────────────────────────── */
+        .sustain-header-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 10px;
+          border-radius: 12px;
+          font-size: 0.82rem;
+          font-weight: 600;
+        }
+        .sustain-header-chip.pass { background: rgba(76,175,80,0.15); color: var(--success-color, #4caf50); }
+        .sustain-header-chip.fail { background: rgba(244,67,54,0.12); color: var(--error-color, #f44336); }
+        .sustain-header-chip.na   { background: var(--secondary-background-color); color: var(--secondary-text-color); }
       </style>
 
       <div class="dashboard-container">
@@ -453,7 +496,66 @@ class SolarReservePanel extends HTMLElement {
             <span id="sun-phase">-</span>
             <span>Runtime:&nbsp;<span id="runtime-val" class="master-footer-val">-</span></span>
           </div>
+          <!-- Permission Conditions strip -->
+          <div class="conditions-strip">
+            <div class="cond-pill" id="cond-a">
+              <span class="cond-icon" id="cond-a-icon">○</span>
+              <span class="cond-label">Condition A — Surplus &gt; 0</span>
+              <span class="cond-val" id="cond-a-val">—</span>
+            </div>
+            <div class="cond-pill" id="cond-b">
+              <span class="cond-icon" id="cond-b-icon">○</span>
+              <span class="cond-label" id="cond-b-label">Condition B — Battery Sustain</span>
+              <span class="cond-val" id="cond-b-val">—</span>
+            </div>
+          </div>
         </div>
+
+        <!-- Battery Sustain Analysis (shown only when power sensors configured) -->
+        <details class="collapsible-card" id="sustain-card" style="display:none">
+          <summary>
+            ⚡ Battery Sustain Analysis
+            <span class="sustain-header-chip na" id="sustain-chip">—</span>
+          </summary>
+          <div class="grid-2" style="margin-top:16px">
+            <div>
+              <div class="metric-row">
+                <span>30-day Managed Load Peak</span>
+                <span id="sustain-peak" class="value">—</span>
+              </div>
+              <div class="metric-row">
+                <span>Current Solar Generation</span>
+                <span id="sustain-solar-kw" class="value">—</span>
+              </div>
+              <div class="metric-row">
+                <span>Current Home Power (incl. load when ON)</span>
+                <span id="sustain-home-kw" class="value">—</span>
+              </div>
+              <div class="metric-row">
+                <span id="sustain-discharge-label">Net Battery Discharge (load OFF → ON)</span>
+                <span id="sustain-net-kw" class="value">—</span>
+              </div>
+            </div>
+            <div>
+              <div class="metric-row">
+                <span>Usable Battery (above emergency floor)</span>
+                <span id="sustain-usable-kwh" class="value">—</span>
+              </div>
+              <div class="metric-row">
+                <span>Battery Runway at Net Discharge Rate</span>
+                <span id="sustain-runway-hrs" class="value">—</span>
+              </div>
+              <div class="metric-row">
+                <span id="sustain-req-label">Required Runway</span>
+                <span id="sustain-req-hrs" class="value">—</span>
+              </div>
+              <div class="metric-row total-row">
+                <span>Battery Can Sustain Load</span>
+                <span id="sustain-result" class="value">—</span>
+              </div>
+            </div>
+          </div>
+        </details>
 
         <!-- Energy Equation -->
         <div class="grid-2">
@@ -647,6 +749,18 @@ class SolarReservePanel extends HTMLElement {
               <div class="metric-row">
                 <span>Rated Energy Capacity</span>
                 <span id="raw-cap" class="value">-</span>
+              </div>
+              <div class="metric-row" id="raw-solar-pwr-row" style="display:none">
+                <span>Current Solar Power (live)</span>
+                <span id="raw-solar-pwr" class="value">-</span>
+              </div>
+              <div class="metric-row" id="raw-home-pwr-row" style="display:none">
+                <span>Current Home Power (live)</span>
+                <span id="raw-home-pwr" class="value">-</span>
+              </div>
+              <div class="metric-row" id="raw-peak-pwr-row" style="display:none">
+                <span>Managed Load 30-day Peak</span>
+                <span id="raw-peak-pwr" class="value">-</span>
               </div>
             </div>
           </div>
@@ -908,6 +1022,146 @@ class SolarReservePanel extends HTMLElement {
       setTooltip('raw-solar-tom', 'Raw tracking input from the solar forecast for tomorrow output.');
       setTooltip('raw-battery', 'Raw tracking input from the battery status sensor (' + battType + ').');
       setTooltip('raw-battery-full', 'Raw tracking input from the battery status sensor (' + battType + ').');
+
+      // ── Condition pills ────────────────────────────────────────────────────
+      const surplus = attrs.calculated_surplus_kwh !== undefined ? parseFloat(attrs.calculated_surplus_kwh) : null;
+      const condA = surplus !== null ? surplus > 0 : null;
+      const hasSustain = (attrs.managed_load_peak_kw || 0) > 0;
+      const condB = hasSustain ? (attrs.battery_can_sustain === true) : null;
+
+      const pillA = this.shadowRoot.getElementById('cond-a');
+      const iconA = this.shadowRoot.getElementById('cond-a-icon');
+      const valA  = this.shadowRoot.getElementById('cond-a-val');
+      if (pillA && iconA && valA) {
+        if (condA === null) {
+          pillA.className = 'cond-pill na';
+          iconA.textContent = '○'; valA.textContent = '—';
+        } else if (condA) {
+          pillA.className = 'cond-pill pass';
+          iconA.textContent = '✓'; valA.textContent = surplus !== null ? ('+' + surplus.toFixed(2) + ' kWh') : '';
+        } else {
+          pillA.className = 'cond-pill fail';
+          iconA.textContent = '✗'; valA.textContent = surplus !== null ? (surplus.toFixed(2) + ' kWh') : '';
+        }
+      }
+
+      const pillB = this.shadowRoot.getElementById('cond-b');
+      const iconB = this.shadowRoot.getElementById('cond-b-icon');
+      const valB  = this.shadowRoot.getElementById('cond-b-val');
+      const labelB = this.shadowRoot.getElementById('cond-b-label');
+      if (pillB && iconB && valB) {
+        if (!hasSustain) {
+          pillB.className = 'cond-pill na';
+          iconB.textContent = 'ℹ';
+          if (labelB) labelB.textContent = 'Condition B — Battery Sustain';
+          valB.textContent = 'not configured';
+        } else if (condB) {
+          pillB.className = 'cond-pill pass';
+          iconB.textContent = '✓';
+          const hrs = attrs.battery_sustain_hours;
+          const hrsStr = (hrs >= 999) ? '∞' : (parseFloat(hrs).toFixed(1) + ' h');
+          if (labelB) labelB.textContent = 'Condition B — Battery Sustain';
+          valB.textContent = hrsStr + ' runway';
+        } else {
+          pillB.className = 'cond-pill fail';
+          iconB.textContent = '✗';
+          const hrs = attrs.battery_sustain_hours;
+          const hrsStr = (hrs >= 999) ? '∞' : (parseFloat(hrs).toFixed(1) + ' h');
+          if (labelB) labelB.textContent = 'Condition B — Battery Sustain';
+          valB.textContent = hrsStr + ' runway (insufficient)';
+        }
+      }
+
+      // ── Battery Sustain analysis card ──────────────────────────────────────
+      const sustainCard = this.shadowRoot.getElementById('sustain-card');
+      if (sustainCard) sustainCard.style.display = hasSustain ? '' : 'none';
+      if (hasSustain) {
+        const peakKw    = parseFloat(attrs.managed_load_peak_kw) || 0;
+        const solarKw   = parseFloat(attrs.current_solar_power_kw) || 0;
+        const homeKw    = parseFloat(attrs.current_home_power_kw) || 0;
+        const netKw     = parseFloat(attrs.net_battery_discharge_kw) || 0;
+        const sustainHrs = parseFloat(attrs.battery_sustain_hours) || 0;
+        const emergResKwh = parseFloat(attrs.dyn_emergency_reserve_kwh) || 0;
+        const curBattKwh = data.battCharge ? (parseFloat(data.battCharge.state) || 0) : 0;
+        const usableKwh = Math.max(0, curBattKwh - emergResKwh);
+        const canSustain = attrs.battery_can_sustain === true;
+        const bufHrs = parseFloat(attrs.dyn_morning_buffer_kwh) || 1.5; // proxy for runway config
+
+        // Chip in header
+        const chip = this.shadowRoot.getElementById('sustain-chip');
+        if (chip) {
+          chip.textContent = canSustain ? '✓ Pass' : '✗ Fail';
+          chip.className = 'sustain-header-chip ' + (canSustain ? 'pass' : 'fail');
+        }
+
+        // Prev permission to determine discharge label
+        const prevPerm = data.permission.state === 'on';
+        const dischLabel = this.shadowRoot.getElementById('sustain-discharge-label');
+        if (dischLabel) {
+          dischLabel.textContent = prevPerm
+            ? 'Net Battery Discharge (load currently ON)'
+            : 'Net Battery Discharge (load OFF → if turned ON)';
+        }
+
+        const fpKw  = v => v.toFixed(2) + ' kW';
+        const fpHrs = v => (v >= 999 ? '∞' : v.toFixed(1)) + ' h';
+        setText('sustain-peak',     peakKw.toFixed(2) + ' kW');
+        setText('sustain-solar-kw', fpKw(solarKw));
+        setText('sustain-home-kw',  fpKw(homeKw));
+        setText('sustain-net-kw',   netKw === 0 ? '0.00 kW (solar covers load ✓)' : fpKw(netKw));
+        setText('sustain-usable-kwh', usableKwh.toFixed(2) + ' kWh');
+        setText('sustain-runway-hrs', netKw > 0 ? fpHrs(sustainHrs) : '∞ (no discharge)');
+
+        // Required runway label is phase-aware
+        const reqLabel = this.shadowRoot.getElementById('sustain-req-label');
+        if (reqLabel) {
+          reqLabel.textContent = isNight
+            ? 'Required — until sunrise'
+            : 'Required — morning buffer runway';
+        }
+        // Compute required energy/hours for display
+        let reqDisplay = '—';
+        if (netKw === 0) {
+          reqDisplay = '0 h (solar sufficient)';
+        } else if (isNight && data.available) {
+          // hours_to_sunrise is not directly exposed; show the required energy instead
+          const energyNeeded = (parseFloat(attrs.net_battery_discharge_kw) || 0);
+          reqDisplay = 'until sunrise';
+        } else {
+          // daytime: morning_buffer_hours × net discharge rate = energy needed
+          const morningBufHrs = parseFloat(attrs.dyn_morning_buffer_kwh) || 0; // not hours but kWh — use a proxy
+          reqDisplay = 'see morning buffer config';
+        }
+        setText('sustain-req-hrs', reqDisplay);
+        const resultEl = this.shadowRoot.getElementById('sustain-result');
+        if (resultEl) {
+          resultEl.textContent = canSustain ? '✓ Yes' : '✗ No';
+          resultEl.style.color = canSustain ? 'var(--success-color, #4caf50)' : 'var(--error-color, #f44336)';
+        }
+
+        // Tooltips
+        setTooltip('sustain-peak',     '30-day historical peak draw of the managed load power sensor.');
+        setTooltip('sustain-solar-kw', 'Live instantaneous solar generation. Zero at night.');
+        setTooltip('sustain-home-kw',  'Live instantaneous total home power draw. Includes the managed load when it is currently running.');
+        setTooltip('sustain-net-kw',   'Net battery discharge rate if the managed load is ON = max(0, home + peak − solar). Zero means solar covers everything.');
+        setTooltip('sustain-usable-kwh', 'Battery energy available above the emergency reserve floor.');
+        setTooltip('sustain-runway-hrs', 'How long the battery can sustain the net discharge rate: usable battery ÷ net discharge rate.');
+        setTooltip('sustain-req-hrs',  'Minimum runway required: morning buffer hours (daytime) or time until sunrise (night).');
+        setTooltip('sustain-result',   'Whether the battery has sufficient runway to sustain the managed load without drawing from the grid.');
+
+        // Show power sensor raw rows
+        const showRow = (id, val, unit) => {
+          const row = this.shadowRoot.getElementById(id + '-row');
+          if (row) row.style.display = '';
+          setText(id, val.toFixed(2) + ' ' + unit);
+        };
+        showRow('raw-solar-pwr', solarKw, 'kW');
+        showRow('raw-home-pwr', homeKw, 'kW');
+        showRow('raw-peak-pwr', peakKw, 'kW');
+        setTooltip('raw-solar-pwr', 'Live solar power from the current_solar_power sensor.');
+        setTooltip('raw-home-pwr', 'Live home power from the current_home_power sensor (includes managed load when ON).');
+        setTooltip('raw-peak-pwr', '30-day historical peak of the managed load power sensor used for net discharge estimation.');
+      }
     }
 
     // ── Calculated Surplus + trend indicator ───────────────────────────────
