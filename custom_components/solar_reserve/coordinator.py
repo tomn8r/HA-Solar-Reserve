@@ -738,9 +738,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             rest_of_day_load = 0.0
             load_expected = rest_of_night_load
 
-            managed_load_used = self._get_usage_since(
-                self._get_config(CONF_LOAD_ENERGY), "sunset_ac_energy", "max_ac_energy_since_sunset"
-            )
+            managed_load_used = ac_used  # same quantity already computed above for used_so_far_tonight
         else:
             home_used = self._get_usage_since(
                 self._get_config(CONF_TOTAL_HOME_ENERGY), "sunrise_energy", "max_energy_since_sunrise"
