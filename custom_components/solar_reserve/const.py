@@ -17,6 +17,9 @@ CONF_EMERGENCY_RESERVE_PERCENT = "emergency_reserve_percent"
 CONF_LOAD_ENERGY = "load_energy"
 CONF_MORNING_BUFFER_HOURS = "morning_buffer_hours"
 CONF_MAX_PERIOD_LOAD = "max_period_load_kwh"
+CONF_CURRENT_SOLAR_POWER = "current_solar_power"   # optional: instantaneous solar generation
+CONF_CURRENT_HOME_POWER  = "current_home_power"    # optional: instantaneous total home consumption
+CONF_MANAGED_LOAD_POWER  = "managed_load_power"    # optional: managed load power (for 30-day peak)
 
 # Defaults
 DEFAULT_AVG_NIGHT_LOAD = 10.0

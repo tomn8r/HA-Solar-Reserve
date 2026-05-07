@@ -25,6 +25,9 @@ from .const import (
     CONF_LOAD_ENERGY,
     CONF_MORNING_BUFFER_HOURS,
     CONF_MAX_PERIOD_LOAD,
+    CONF_CURRENT_SOLAR_POWER,
+    CONF_CURRENT_HOME_POWER,
+    CONF_MANAGED_LOAD_POWER,
     DEFAULT_AVG_NIGHT_LOAD,
     DEFAULT_AVG_DAY_LOAD,
     DEFAULT_APPLIANCE_POWER_KW,
@@ -76,6 +79,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             # False only on a fresh install/reinstall when recorder seeding failed.
             # Defaults to True so existing upgrades don't re-trigger seeding.
             "snapshots_seeded": True,
+            # 30-day historical peak of the managed load power sensor (kW).
+            # Persisted so it survives restarts without needing an immediate recorder query.
+            "managed_load_peak_kw": 0.0,
         }
 
         # In-memory only: rolling max values for meter-reset detection
@@ -113,6 +119,10 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             # Dashboard UX metadata
             "is_night": False,
             "battery_sensor_type": "energy",
+            # Battery sustain diagnostics
+            "managed_load_peak_kw": 0.0,
+            "net_battery_discharge_kw": 0.0,
+            "battery_sustain_hours": 0.0,
         }
 
     def _get_config(self, key, default=None):
@@ -333,12 +343,18 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
 
         self._recalc_average()
 
+        # Sync persisted managed load peak into calculated_data on startup
+        self.calculated_data["managed_load_peak_kw"] = self.data_store.get("managed_load_peak_kw", 0.0)
+
         entities = [
             self._get_config(CONF_TOTAL_HOME_ENERGY),
             self._get_config(CONF_BATTERY_REMAINING),
             self._get_config(CONF_SOLAR_REMAINING_TODAY),
             self._get_config(CONF_SOLAR_TOMORROW),
             self._get_config(CONF_LOAD_ENERGY),
+            # Power sensors — trigger recalculate on each reading so permission is live
+            self._get_config(CONF_CURRENT_SOLAR_POWER),
+            self._get_config(CONF_CURRENT_HOME_POWER),
         ]
 
         cap_ent = self._get_config(CONF_BATTERY_CAPACITY_ENTITY)
@@ -363,6 +379,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
                 self.hass, ["sun.sun"], self._async_sun_changed
             )
         )
+
+        # Seed the 30-day managed load peak from recorder history
+        await self._async_refresh_managed_load_peak()
 
         self.async_set_updated_data(self.calculated_data)
         self._recalculate()
@@ -415,6 +434,106 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
                 pass
                 
         return self._last_good_states.get(entity_id, default)
+
+    def _safe_power_kw(self, entity_id, default=0.0):
+        """Safely read an instantaneous power sensor, returning value in kW.
+
+        Accepts sensors reporting in W, kW, or MW and scales to kW automatically.
+        Returns the last known good value if the sensor is temporarily unavailable.
+        """
+        if not entity_id:
+            return default
+        state = self.hass.states.get(entity_id)
+        if state and state.state not in (None, "unknown", "unavailable"):
+            try:
+                val = float(state.state)
+                unit = state.attributes.get("unit_of_measurement", "")
+                if unit == "W":
+                    val /= 1000.0
+                elif unit == "MW":
+                    val *= 1000.0
+                # kW stays as-is; dimensionless treated as kW
+                val = max(0.0, val)
+                self._last_good_states[entity_id] = val
+                return val
+            except (ValueError, TypeError):
+                pass
+        return self._last_good_states.get(entity_id, default)
+
+    async def _async_refresh_managed_load_peak(self) -> None:
+        """Query the recorder for the 30-day peak of the managed load power sensor.
+
+        The result is stored in data_store (persisted) and calculated_data so it
+        survives restarts without an immediate recorder query.  Called once on init
+        and again at each sunrise so the figure stays current.
+        """
+        entity_id = self._get_config(CONF_MANAGED_LOAD_POWER)
+        if not entity_id:
+            return
+
+        try:
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder.history import (  # noqa: PLC0415
+                get_significant_states,
+            )
+            instance = get_instance(self.hass)
+        except Exception:
+            _LOGGER.debug("Solar Reserve: recorder unavailable for managed load peak query")
+            return
+
+        now = dt_util.utcnow()
+        start_time = now - datetime.timedelta(days=30)
+
+        try:
+            states_dict: dict = await instance.async_add_executor_job(
+                get_significant_states,
+                self.hass,
+                start_time,
+                now,
+                [entity_id],
+                None,   # filters
+                True,   # include_start_time_state
+                True,   # significant_changes_only — reduce data volume for power sensor
+            )
+        except Exception as err:
+            _LOGGER.debug("Solar Reserve: managed load peak query failed: %s", err)
+            return
+
+        states = states_dict.get(entity_id, [])
+        if not states:
+            _LOGGER.debug("Solar Reserve: no states returned for managed load power sensor %s", entity_id)
+            return
+
+        # Determine unit from the live state (most reliable source)
+        live = self.hass.states.get(entity_id)
+        unit = live.attributes.get("unit_of_measurement", "") if live else ""
+
+        peak_kw = 0.0
+        for s in states:
+            if s.state in (None, "unknown", "unavailable"):
+                continue
+            try:
+                val = float(s.state)
+                if unit == "W":
+                    val /= 1000.0
+                elif unit == "MW":
+                    val *= 1000.0
+                if val > peak_kw:
+                    peak_kw = val
+            except (ValueError, TypeError):
+                continue
+
+        if peak_kw > 0:
+            self.data_store["managed_load_peak_kw"] = round(peak_kw, 3)
+            self.calculated_data["managed_load_peak_kw"] = round(peak_kw, 3)
+            _LOGGER.info(
+                "Solar Reserve: managed load 30-day peak = %.3f kW (%d states sampled)",
+                peak_kw, len(states),
+            )
+        else:
+            _LOGGER.debug(
+                "Solar Reserve: managed load peak query returned no positive values for %s", entity_id
+            )
 
     def _get_usage_since(self, entity_id, start_key, max_key):
         """Calculate energy used since a snapshot, handling daily resets."""
@@ -544,6 +663,9 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         self.data_store["entry_id"] = self.entry.entry_id
 
         self.hass.async_create_task(self._store.async_save(self.data_store))
+
+        # Refresh 30-day managed load peak daily at sunrise
+        self.hass.async_create_task(self._async_refresh_managed_load_peak())
 
     def _recalc_average(self):
         """Recalculate the 7-day rolling averages, filtering statistical outliers."""
@@ -803,7 +925,68 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         surplus = energy_available - energy_required
 
         self.calculated_data["surplus_kwh"] = surplus
-        self.calculated_data["permission"] = surplus > 0
+
+        # --- Permission: two conditions must both be True ---
+        #
+        # (a) Overall surplus is positive — the existing energy-budget check.
+        #
+        # (b) Battery sustain check — the battery (above the emergency floor) can
+        #     maintain the net discharge rate from right now until solar is expected
+        #     to cover the combined home + managed load.  This prevents the managed
+        #     load being switched ON only for the appliance to immediately pull from
+        #     the grid because the usable battery headroom is effectively zero.
+        #
+        # Condition (b) is only evaluated when all three power sensors are configured.
+        # If any is absent, only condition (a) governs.
+
+        solar_ent = self._get_config(CONF_CURRENT_SOLAR_POWER)
+        home_ent  = self._get_config(CONF_CURRENT_HOME_POWER)
+        managed_load_peak_kw = self.data_store.get("managed_load_peak_kw", 0.0)
+        power_sensors_ready = bool(solar_ent and home_ent and managed_load_peak_kw > 0)
+
+        if power_sensors_ready:
+            solar_power_kw = self._safe_power_kw(solar_ent)
+            home_power_kw  = self._safe_power_kw(home_ent)
+
+            # If the managed load is already ON (previous permission was True), the
+            # home power sensor already includes its draw — don't add peak again.
+            prev_permission = self.calculated_data.get("permission", False)
+            if prev_permission:
+                projected_total_kw = home_power_kw
+            else:
+                projected_total_kw = home_power_kw + managed_load_peak_kw
+
+            net_discharge_kw = max(0.0, projected_total_kw - solar_power_kw)
+
+            if net_discharge_kw == 0.0:
+                # Solar already covers home + managed load; battery not needed.
+                battery_can_sustain = True
+            else:
+                usable_battery = max(0.0, current_battery - emergency_reserve)
+                if is_night:
+                    # Must sustain until sunrise; no solar help is coming.
+                    energy_needed_kwh = net_discharge_kw * (remaining_duration / 3600.0)
+                    battery_can_sustain = usable_battery >= energy_needed_kwh
+                else:
+                    # Daytime: require at least morning_buffer_hours of usable runway
+                    # at the current net discharge rate before granting permission.
+                    runway_hours = float(self._get_config(CONF_MORNING_BUFFER_HOURS, DEFAULT_MORNING_BUFFER_HOURS))
+                    battery_can_sustain = usable_battery >= net_discharge_kw * runway_hours
+
+            # Export diagnostics
+            self.calculated_data["net_battery_discharge_kw"] = round(net_discharge_kw, 3)
+            self.calculated_data["battery_sustain_hours"] = (
+                round(max(0.0, current_battery - emergency_reserve) / net_discharge_kw, 2)
+                if net_discharge_kw > 0 else 999.0
+            )
+        else:
+            # Power sensors not configured — fall back to surplus check only.
+            battery_can_sustain = True
+            self.calculated_data["net_battery_discharge_kw"] = 0.0
+            self.calculated_data["battery_sustain_hours"] = 0.0
+
+        self.calculated_data["managed_load_peak_kw"] = round(managed_load_peak_kw, 3)
+        self.calculated_data["permission"] = surplus > 0 and battery_can_sustain
         try:
             self.calculated_data["estimated_runtime"] = (
                 max(0.0, surplus / DEFAULT_APPLIANCE_POWER_KW) if surplus > 0 else 0.0

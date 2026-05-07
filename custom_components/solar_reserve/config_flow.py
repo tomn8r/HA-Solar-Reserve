@@ -19,6 +19,9 @@ from .const import (
     CONF_LOAD_ENERGY,
     CONF_MORNING_BUFFER_HOURS,
     CONF_MAX_PERIOD_LOAD,
+    CONF_CURRENT_SOLAR_POWER,
+    CONF_CURRENT_HOME_POWER,
+    CONF_MANAGED_LOAD_POWER,
     NAME
 )
 
@@ -47,6 +50,9 @@ def _get_user_schema(defaults=None):
     schema.update(_req(CONF_TOTAL_HOME_ENERGY, defaults, _ENTITY_SELECTOR))
     schema[vol.Required(CONF_METER_RESETS_DAILY, default=defaults.get(CONF_METER_RESETS_DAILY, False))] = bool
     schema.update(_opt(CONF_LOAD_ENERGY, defaults, _ENTITY_SELECTOR))
+    schema.update(_opt(CONF_CURRENT_SOLAR_POWER, defaults, _ENTITY_SELECTOR))
+    schema.update(_opt(CONF_CURRENT_HOME_POWER, defaults, _ENTITY_SELECTOR))
+    schema.update(_opt(CONF_MANAGED_LOAD_POWER, defaults, _ENTITY_SELECTOR))
     schema.update(_req(CONF_SOLAR_REMAINING_TODAY, defaults, _ENTITY_SELECTOR))
     schema.update(_req(CONF_SOLAR_TOMORROW, defaults, _ENTITY_SELECTOR))
     schema[vol.Required(CONF_MORNING_BUFFER_HOURS, default=defaults.get(CONF_MORNING_BUFFER_HOURS, 1.5))] = selector.NumberSelector(
