@@ -26,6 +26,9 @@ from .const import (
 )
 
 _ENTITY_SELECTOR = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
+_ENERGY_ENTITY_SELECTOR = selector.EntitySelector(
+    selector.EntitySelectorConfig(domain="sensor", device_class="energy")
+)
 
 
 def _req(key, defaults, entity_selector):
@@ -47,9 +50,9 @@ def _opt(key, defaults, entity_selector):
 def _get_user_schema(defaults=None):
     defaults = defaults or {}
     schema = {}
-    schema.update(_req(CONF_TOTAL_HOME_ENERGY, defaults, _ENTITY_SELECTOR))
+    schema.update(_req(CONF_TOTAL_HOME_ENERGY, defaults, _ENERGY_ENTITY_SELECTOR))
     schema[vol.Required(CONF_METER_RESETS_DAILY, default=defaults.get(CONF_METER_RESETS_DAILY, False))] = bool
-    schema.update(_opt(CONF_LOAD_ENERGY, defaults, _ENTITY_SELECTOR))
+    schema.update(_opt(CONF_LOAD_ENERGY, defaults, _ENERGY_ENTITY_SELECTOR))
     schema.update(_opt(CONF_CURRENT_SOLAR_POWER, defaults, _ENTITY_SELECTOR))
     schema.update(_opt(CONF_CURRENT_HOME_POWER, defaults, _ENTITY_SELECTOR))
     schema.update(_opt(CONF_MANAGED_LOAD_POWER, defaults, _ENTITY_SELECTOR))

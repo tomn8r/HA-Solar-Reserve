@@ -1,6 +1,7 @@
 """Coordinator for HA Solar Reserve."""
 from __future__ import annotations
 
+import functools
 import logging
 from typing import TYPE_CHECKING
 import datetime
@@ -123,9 +124,11 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             "managed_load_peak_kw": 0.0,
             "net_battery_discharge_kw": 0.0,
             "battery_sustain_hours": 0.0,
+            "battery_sustain_required_kwh": 0.0,
             "battery_can_sustain": True,
             "current_solar_power_kw": 0.0,
             "current_home_power_kw": 0.0,
+            "morning_buffer_hours_config": DEFAULT_MORNING_BUFFER_HOURS,
         }
 
     def _get_config(self, key, default=None):
@@ -166,14 +169,15 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
 
         try:
             states_dict: dict = await instance.async_add_executor_job(
-                get_significant_states,
-                self.hass,
-                start_time,
-                now,
-                entities,
-                None,   # filters
-                True,   # include_start_time_state
-                False,  # significant_changes_only — capture all energy readings
+                functools.partial(
+                    get_significant_states,
+                    self.hass,
+                    start_time,
+                    now,
+                    entity_ids=entities,
+                    include_start_time_state=True,
+                    significant_changes_only=False,
+                )
             )
         except Exception as err:
             _LOGGER.debug("Solar Reserve: recorder query failed: %s", err)
@@ -489,14 +493,15 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
 
         try:
             states_dict: dict = await instance.async_add_executor_job(
-                get_significant_states,
-                self.hass,
-                start_time,
-                now,
-                [entity_id],
-                None,   # filters
-                True,   # include_start_time_state
-                True,   # significant_changes_only — reduce data volume for power sensor
+                functools.partial(
+                    get_significant_states,
+                    self.hass,
+                    start_time,
+                    now,
+                    entity_ids=[entity_id],
+                    include_start_time_state=True,
+                    significant_changes_only=True,
+                )
             )
         except Exception as err:
             _LOGGER.debug("Solar Reserve: managed load peak query failed: %s", err)
@@ -775,6 +780,8 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         battery_sensor_state = self._safe_float(self._get_config(CONF_BATTERY_REMAINING), default=None)
         if battery_sensor_state is None:
             _LOGGER.debug("HA Solar Reserve: Battery sensor unavailable and no previous cache exists. Delaying recalculation.")
+            self.calculated_data["permission"] = False
+            self.async_set_updated_data(self.calculated_data)
             return
             
         sensor_type = self._get_config(CONF_BATTERY_SENSOR_TYPE, "energy")
@@ -787,6 +794,8 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         solar_today = self._safe_float(self._get_config(CONF_SOLAR_REMAINING_TODAY), default=None)
         if solar_today is None:
             _LOGGER.debug("HA Solar Reserve: Solar today sensor unavailable and no previous cache exists. Delaying recalculation.")
+            self.calculated_data["permission"] = False
+            self.async_set_updated_data(self.calculated_data)
             return
             
         solar_tomorrow = self._safe_float(self._get_config(CONF_SOLAR_TOMORROW), default=0.0)
@@ -947,6 +956,10 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
         managed_load_peak_kw = self.data_store.get("managed_load_peak_kw", 0.0)
         power_sensors_ready = bool(solar_ent and home_ent and managed_load_peak_kw > 0)
 
+        # Always expose the configured morning buffer hours for display
+        _morning_buffer_hours = float(self._get_config(CONF_MORNING_BUFFER_HOURS, DEFAULT_MORNING_BUFFER_HOURS))
+        self.calculated_data["morning_buffer_hours_config"] = _morning_buffer_hours
+
         if power_sensors_ready:
             solar_power_kw = self._safe_power_kw(solar_ent)
             home_power_kw  = self._safe_power_kw(home_ent)
@@ -964,23 +977,25 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             if net_discharge_kw == 0.0:
                 # Solar already covers home + managed load; battery not needed.
                 battery_can_sustain = True
+                sustain_required_kwh = 0.0
             else:
                 usable_battery = max(0.0, current_battery - emergency_reserve)
                 if is_night:
                     # Must sustain until sunrise; no solar help is coming.
-                    energy_needed_kwh = net_discharge_kw * (remaining_duration / 3600.0)
-                    battery_can_sustain = usable_battery >= energy_needed_kwh
+                    sustain_required_kwh = net_discharge_kw * (remaining_duration / 3600.0)
+                    battery_can_sustain = usable_battery >= sustain_required_kwh
                 else:
                     # Daytime: require at least morning_buffer_hours of usable runway
                     # at the current net discharge rate before granting permission.
-                    runway_hours = float(self._get_config(CONF_MORNING_BUFFER_HOURS, DEFAULT_MORNING_BUFFER_HOURS))
-                    battery_can_sustain = usable_battery >= net_discharge_kw * runway_hours
+                    sustain_required_kwh = net_discharge_kw * _morning_buffer_hours
+                    battery_can_sustain = usable_battery >= sustain_required_kwh
 
             # Export diagnostics
             self.calculated_data["current_solar_power_kw"] = round(solar_power_kw, 3)
             self.calculated_data["current_home_power_kw"] = round(home_power_kw, 3)
             self.calculated_data["net_battery_discharge_kw"] = round(net_discharge_kw, 3)
             self.calculated_data["battery_can_sustain"] = battery_can_sustain
+            self.calculated_data["battery_sustain_required_kwh"] = round(sustain_required_kwh, 3)
             self.calculated_data["battery_sustain_hours"] = (
                 round(max(0.0, current_battery - emergency_reserve) / net_discharge_kw, 2)
                 if net_discharge_kw > 0 else 999.0
@@ -992,6 +1007,7 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
             self.calculated_data["current_home_power_kw"] = 0.0
             self.calculated_data["net_battery_discharge_kw"] = 0.0
             self.calculated_data["battery_can_sustain"] = True
+            self.calculated_data["battery_sustain_required_kwh"] = 0.0
             self.calculated_data["battery_sustain_hours"] = 0.0
 
         self.calculated_data["managed_load_peak_kw"] = round(managed_load_peak_kw, 3)

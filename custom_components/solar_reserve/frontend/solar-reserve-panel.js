@@ -779,26 +779,47 @@ class SolarReservePanel extends HTMLElement {
   updateData() {
     if (!this._hass) return;
 
+    // ── Entity discovery ────────────────────────────────────────────────────
+    // Step 1: Build a confirmed set of solar_reserve entity IDs by checking
+    // hass.entities (available since HA 2022+). This prevents substring
+    // matches from accidentally picking up entities from other integrations.
     const states = this._hass.states;
-    let data = {};
-
-    for (const [entityId, stateObj] of Object.entries(states)) {
-      if (entityId.includes('solar_reserve')) {
-        if (entityId.includes('solar_reserve_permission')) data.permission = stateObj;
-        else if (entityId.includes('calculated_surplus')) data.surplus = stateObj;
-        else if (entityId.includes('energy_available')) data.available = stateObj;
-        else if (entityId.includes('energy_required')) data.required = stateObj;
-        else if (entityId.includes('average_overnight_load')) data.avgNight = stateObj;
-        else if (entityId.includes('overnight_load_tracker')) data.actNight = stateObj;
-        else if (entityId.includes('average_daytime_load')) data.avgDay = stateObj;
-        else if (entityId.includes('daytime_load_tracker')) data.actDay = stateObj;
-        else if (entityId.includes('current_battery_charge')) data.battCharge = stateObj;
-        else if (entityId.includes('battery_capacity')) data.batteryCap = stateObj;
-        else if (entityId.includes('solar_counted_today')) data.solarCounted = stateObj;
-        else if (entityId.includes('managed_load_usage')) data.managed = stateObj;
-        else if (entityId.includes('night_data_days')) data.nightDays = stateObj;
-        else if (entityId.includes('day_data_days')) data.dayDays = stateObj;
+    const srEntityIds = new Set();
+    if (this._hass.entities) {
+      for (const [entityId, entry] of Object.entries(this._hass.entities)) {
+        if (entry.platform === 'solar_reserve') srEntityIds.add(entityId);
       }
+    }
+    // Fallback: prefix-based discovery if hass.entities is unavailable
+    if (srEntityIds.size === 0) {
+      for (const entityId of Object.keys(states)) {
+        if (entityId.startsWith('binary_sensor.ha_solar_reserve_') ||
+            entityId.startsWith('sensor.ha_solar_reserve_')) {
+          srEntityIds.add(entityId);
+        }
+      }
+    }
+
+    // Step 2: Map confirmed entities to dashboard data slots.
+    // Substring matching is now safe — all IDs are confirmed solar_reserve entities.
+    let data = {};
+    for (const entityId of srEntityIds) {
+      const stateObj = states[entityId];
+      if (!stateObj) continue;
+      if (entityId.includes('_permission'))              data.permission   = stateObj;
+      else if (entityId.includes('_calculated_surplus')) data.surplus      = stateObj;
+      else if (entityId.includes('_energy_available'))   data.available    = stateObj;
+      else if (entityId.includes('_energy_required'))    data.required     = stateObj;
+      else if (entityId.includes('_average_overnight_load')) data.avgNight = stateObj;
+      else if (entityId.includes('_overnight_load_tracker')) data.actNight = stateObj;
+      else if (entityId.includes('_average_daytime_load'))   data.avgDay   = stateObj;
+      else if (entityId.includes('_daytime_load_tracker'))   data.actDay   = stateObj;
+      else if (entityId.includes('_current_battery_charge')) data.battCharge = stateObj;
+      else if (entityId.includes('_battery_capacity'))   data.batteryCap  = stateObj;
+      else if (entityId.includes('_solar_counted_today')) data.solarCounted = stateObj;
+      else if (entityId.includes('_managed_load_usage')) data.managed      = stateObj;
+      else if (entityId.includes('_night_data_days'))    data.nightDays    = stateObj;
+      else if (entityId.includes('_day_data_days'))      data.dayDays      = stateObj;
     }
 
     // ── Formatting helpers ──────────────────────────────────────────────────
@@ -1085,7 +1106,7 @@ class SolarReservePanel extends HTMLElement {
         const curBattKwh = data.battCharge ? (parseFloat(data.battCharge.state) || 0) : 0;
         const usableKwh = Math.max(0, curBattKwh - emergResKwh);
         const canSustain = attrs.battery_can_sustain === true;
-        const bufHrs = parseFloat(attrs.dyn_morning_buffer_kwh) || 1.5; // proxy for runway config
+        const bufHrsConfig = parseFloat(attrs.morning_buffer_hours_config) || 1.5;
 
         // Chip in header
         const chip = this.shadowRoot.getElementById('sustain-chip');
@@ -1119,18 +1140,15 @@ class SolarReservePanel extends HTMLElement {
             ? 'Required — until sunrise'
             : 'Required — morning buffer runway';
         }
-        // Compute required energy/hours for display
+        // Required runway — quantified display
         let reqDisplay = '—';
+        const reqKwh = parseFloat(attrs.battery_sustain_required_kwh) || 0;
         if (netKw === 0) {
-          reqDisplay = '0 h (solar sufficient)';
-        } else if (isNight && data.available) {
-          // hours_to_sunrise is not directly exposed; show the required energy instead
-          const energyNeeded = (parseFloat(attrs.net_battery_discharge_kw) || 0);
-          reqDisplay = 'until sunrise';
+          reqDisplay = '0 kWh (solar sufficient)';
+        } else if (isNight) {
+          reqDisplay = reqKwh.toFixed(2) + ' kWh until sunrise';
         } else {
-          // daytime: morning_buffer_hours × net discharge rate = energy needed
-          const morningBufHrs = parseFloat(attrs.dyn_morning_buffer_kwh) || 0; // not hours but kWh — use a proxy
-          reqDisplay = 'see morning buffer config';
+          reqDisplay = reqKwh.toFixed(2) + ' kWh (' + bufHrsConfig.toFixed(1) + ' h morning buffer)';
         }
         setText('sustain-req-hrs', reqDisplay);
         const resultEl = this.shadowRoot.getElementById('sustain-result');
