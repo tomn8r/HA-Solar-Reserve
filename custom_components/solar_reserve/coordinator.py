@@ -980,15 +980,10 @@ class SolarReserveCoordinator(DataUpdateCoordinator[dict]):
                 sustain_required_kwh = 0.0
             else:
                 usable_battery = max(0.0, current_battery - emergency_reserve)
-                if is_night:
-                    # Must sustain until sunrise; no solar help is coming.
-                    sustain_required_kwh = net_discharge_kw * (remaining_duration / 3600.0)
-                    battery_can_sustain = usable_battery >= sustain_required_kwh
-                else:
-                    # Daytime: require at least morning_buffer_hours of usable runway
-                    # at the current net discharge rate before granting permission.
-                    sustain_required_kwh = net_discharge_kw * _morning_buffer_hours
-                    battery_can_sustain = usable_battery >= sustain_required_kwh
+                # Require at least morning_buffer_hours of usable runway at the
+                # current net discharge rate before granting permission (day or night).
+                sustain_required_kwh = net_discharge_kw * _morning_buffer_hours
+                battery_can_sustain = usable_battery >= sustain_required_kwh
 
             # Export diagnostics
             self.calculated_data["current_solar_power_kw"] = round(solar_power_kw, 3)

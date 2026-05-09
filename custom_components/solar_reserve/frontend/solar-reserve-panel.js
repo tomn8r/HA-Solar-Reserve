@@ -1133,20 +1133,15 @@ class SolarReservePanel extends HTMLElement {
         setText('sustain-usable-kwh', usableKwh.toFixed(2) + ' kWh');
         setText('sustain-runway-hrs', netKw > 0 ? fpHrs(sustainHrs) : '∞ (no discharge)');
 
-        // Required runway label is phase-aware
+        // Required runway label — always morning buffer runway (day and night)
         const reqLabel = this.shadowRoot.getElementById('sustain-req-label');
-        if (reqLabel) {
-          reqLabel.textContent = isNight
-            ? 'Required — until sunrise'
-            : 'Required — morning buffer runway';
-        }
+        if (reqLabel) reqLabel.textContent = 'Required — morning buffer runway';
+
         // Required runway — quantified display
         let reqDisplay = '—';
         const reqKwh = parseFloat(attrs.battery_sustain_required_kwh) || 0;
         if (netKw === 0) {
           reqDisplay = '0 kWh (solar sufficient)';
-        } else if (isNight) {
-          reqDisplay = reqKwh.toFixed(2) + ' kWh until sunrise';
         } else {
           reqDisplay = reqKwh.toFixed(2) + ' kWh (' + bufHrsConfig.toFixed(1) + ' h morning buffer)';
         }
@@ -1164,7 +1159,7 @@ class SolarReservePanel extends HTMLElement {
         setTooltip('sustain-net-kw',   'Net battery discharge rate if the managed load is ON = max(0, home + peak − solar). Zero means solar covers everything.');
         setTooltip('sustain-usable-kwh', 'Battery energy available above the emergency reserve floor.');
         setTooltip('sustain-runway-hrs', 'How long the battery can sustain the net discharge rate: usable battery ÷ net discharge rate.');
-        setTooltip('sustain-req-hrs',  'Minimum runway required: morning buffer hours (daytime) or time until sunrise (night).');
+        setTooltip('sustain-req-hrs',  'Minimum energy the battery must hold above the emergency floor: net discharge rate × morning buffer hours. Applied at all times.');
         setTooltip('sustain-result',   'Whether the battery has sufficient runway to sustain the managed load without drawing from the grid.');
 
         // Show power sensor raw rows
