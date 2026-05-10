@@ -73,6 +73,22 @@ class SolarReservePanel extends HTMLElement {
           gap: 16px;
         }
 
+        .dashboard-row {
+          display: grid;
+          gap: 16px;
+          margin-bottom: 16px;
+        }
+        .row-3-uneven {
+          grid-template-columns: 1fr 1fr 0.6fr;
+        }
+        .row-2 {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        @media (max-width: 900px) {
+          .row-3-uneven, .row-2 { grid-template-columns: 1fr; }
+        }
+
         @media (max-width: 768px) {
           .grid-2 { grid-template-columns: 1fr; }
         }
@@ -474,96 +490,45 @@ class SolarReservePanel extends HTMLElement {
           </div>
         </div>
 
-        <!-- Master Output -->
-        <div class="card">
-          <div class="card-header">Master Output</div>
-          <div class="grid-2">
-            <div class="status-container">
-              <div class="status-label">Permission</div>
+        <!-- Row 1: Decision -->
+        <h2 style="font-size:1.2rem; font-weight:500; margin:0 0 8px; color:var(--primary-text-color);">Master Decision</h2>
+        <div class="dashboard-row row-2">
+          <div class="card">
+            <div class="card-header" style="font-size:1.1rem;">Permission Output</div>
+            <div class="status-container" style="padding:16px 0;">
               <div id="permission-status" class="status-value status-off">-</div>
               <div id="permission-since" class="permission-since"></div>
-            </div>
-            <div class="status-container">
-              <div class="status-label">Calculated Surplus</div>
-              <div style="display:flex; align-items:baseline; justify-content:center; gap:6px;">
-                <div id="surplus-val" class="status-value status-neutral">-</div>
-                <span id="surplus-trend" class="trend-indicator"></span>
+              <div style="margin-top:24px; font-size:1rem; color:var(--primary-text-color); font-weight:500;">
+                Runtime limit: <span id="runtime-val" class="master-footer-val">-</span>
               </div>
-              <div class="status-label">kWh</div>
             </div>
           </div>
-          <div class="master-footer">
-            <span id="sun-phase">-</span>
-            <span>Runtime:&nbsp;<span id="runtime-val" class="master-footer-val">-</span></span>
-          </div>
-          <!-- Permission Conditions strip -->
-          <div class="conditions-strip">
-            <div class="cond-pill" id="cond-a">
-              <span class="cond-icon" id="cond-a-icon">○</span>
-              <span class="cond-label">Condition A — Surplus &gt; 0</span>
-              <span class="cond-val" id="cond-a-val">—</span>
-            </div>
-            <div class="cond-pill" id="cond-b">
-              <span class="cond-icon" id="cond-b-icon">○</span>
-              <span class="cond-label" id="cond-b-label">Condition B — Battery Sustain</span>
-              <span class="cond-val" id="cond-b-val">—</span>
+          <div class="card">
+            <div class="card-header" style="font-size:1.1rem;">Gate Conditions</div>
+            <div class="conditions-strip" style="flex-direction:column; gap:12px; border-top:none; padding-top:16px;">
+              <div class="cond-pill" id="cond-a" style="width:100%; padding:12px 16px;">
+                <span class="cond-icon" id="cond-a-icon">○</span>
+                <span class="cond-label" style="font-size:0.95rem;">Condition A — Surplus &gt; 0</span>
+                <span class="cond-val" id="cond-a-val" style="font-size:0.9rem;">—</span>
+              </div>
+              <div class="cond-pill" id="cond-b" style="width:100%; padding:12px 16px;">
+                <span class="cond-icon" id="cond-b-icon">○</span>
+                <span class="cond-label" id="cond-b-label" style="font-size:0.95rem;">Condition B — Battery Sustain</span>
+                <span class="cond-val" id="cond-b-val" style="font-size:0.9rem;">—</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Battery Sustain Analysis (shown only when power sensors configured) -->
-        <details class="collapsible-card" id="sustain-card" style="display:none">
-          <summary>
-            ⚡ Battery Sustain Analysis
-            <span class="sustain-header-chip na" id="sustain-chip">—</span>
-          </summary>
-          <div class="grid-2" style="margin-top:16px">
-            <div>
-              <div class="metric-row">
-                <span>30-day Managed Load Peak</span>
-                <span id="sustain-peak" class="value">—</span>
-              </div>
-              <div class="metric-row">
-                <span>Current Solar Generation</span>
-                <span id="sustain-solar-kw" class="value">—</span>
-              </div>
-              <div class="metric-row">
-                <span>Current Home Power (incl. load when ON)</span>
-                <span id="sustain-home-kw" class="value">—</span>
-              </div>
-              <div class="metric-row">
-                <span id="sustain-discharge-label">Net Battery Discharge (load OFF → ON)</span>
-                <span id="sustain-net-kw" class="value">—</span>
-              </div>
-            </div>
-            <div>
-              <div class="metric-row">
-                <span>Usable Battery (above emergency floor)</span>
-                <span id="sustain-usable-kwh" class="value">—</span>
-              </div>
-              <div class="metric-row">
-                <span>Battery Runway at Net Discharge Rate</span>
-                <span id="sustain-runway-hrs" class="value">—</span>
-              </div>
-              <div class="metric-row">
-                <span id="sustain-req-label">Required Runway</span>
-                <span id="sustain-req-hrs" class="value">—</span>
-              </div>
-              <div class="metric-row total-row">
-                <span>Battery Can Sustain Load</span>
-                <span id="sustain-result" class="value">—</span>
-              </div>
-            </div>
-          </div>
-        </details>
-
-        <!-- Energy Equation -->
-        <div class="grid-2">
-          <!-- Assets -->
-          <div class="card">
+        <!-- Row 2: The Equation -->
+        <h2 style="font-size:1.2rem; font-weight:500; margin:16px 0 8px; color:var(--primary-text-color); display:flex; align-items:center; gap:8px;">
+          Energy Balance (Condition A)
+          <span class="sustain-header-chip na" id="energy-chip" style="font-size:0.8rem;">—</span>
+        </h2>
+        <div class="dashboard-row row-3-uneven">
+          <!-- Card 1: Assets -->
+          <div class="card" style="display:flex; flex-direction:column;">
             <div class="card-header">Energy Available</div>
-
-            <!-- Formula: Battery + Solar = Total -->
             <div class="energy-formula">
               <div class="formula-item" id="batt-charge-item">
                 <div class="formula-icon">🔋</div>
@@ -586,11 +551,10 @@ class SolarReservePanel extends HTMLElement {
                 <div class="formula-unit">kWh</div>
               </div>
             </div>
-
           </div>
 
-          <!-- Liabilities —— formula style, mirrors Assets -->
-          <div class="card">
+          <!-- Card 2: Liabilities -->
+          <div class="card" style="display:flex; flex-direction:column;">
             <div class="card-header">Energy Required</div>
             <div class="energy-formula">
               <div class="formula-item" id="exp-load-item">
@@ -621,146 +585,184 @@ class SolarReservePanel extends HTMLElement {
                 <div class="formula-unit">kWh</div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Today's Load & Tomorrow's Load -->
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-header">Today's Remaining Load</div>
-            <div class="metric-row" id="dyn-day-row">
-              <span id="dyn-day-label">Remaining Day Load</span>
-              <span id="dyn-day" class="value">-</span>
-            </div>
-            <div class="metric-row">
-              <span id="dyn-night-label">Remaining Night Load</span>
-              <span id="dyn-night" class="value">-</span>
-            </div>
-            <div class="metric-row">
-              <span>Morning Buffer</span>
-              <span id="dyn-buffer" class="value">-</span>
-            </div>
-            <div class="metric-row total-row">
-              <span>= Expected Load</span>
-              <span id="dyn-total" class="value">-</span>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-header">Tomorrow's Deficit / Surplus</div>
-            <div class="metric-row">
-              <span>Expected Usage (Tomorrow Day + Tomorrow Night)</span>
-              <span id="tom-expected" class="value">-</span>
-            </div>
-            <div class="metric-row sub-row" id="tom-buffer-deduct-row">
-              <span>Less: Morning Buffer (reserved in Today's Load)</span>
-              <span id="tom-buffer-deduct" class="value">-</span>
-            </div>
-            <div class="metric-row">
-              <span>Solar Forecast Tomorrow</span>
-              <span id="solar-tom" class="value">-</span>
-            </div>
-            <div class="metric-row" id="tom-shortfall-row">
-              <span id="tom-shortfall-label">Shortfall (Deficit)</span>
-              <span id="tom-shortfall" class="value">-</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Surplus equation notation: Available − Required = Surplus -->
-        <div class="surplus-equation">
-          <div class="eq-term">
-            <span class="eq-label">Available</span>
-            <span id="eq-available" class="eq-val">—</span>
-            <span class="eq-unit">kWh</span>
-          </div>
-          <span class="eq-op">−</span>
-          <div class="eq-term">
-            <span class="eq-label">Required</span>
-            <span id="eq-required" class="eq-val">—</span>
-            <span class="eq-unit">kWh</span>
-          </div>
-          <span class="eq-op">=</span>
-          <div class="eq-term">
-            <span class="eq-label">Surplus</span>
-            <span id="eq-surplus" class="eq-val">—</span>
-            <span class="eq-unit">kWh</span>
-          </div>
-        </div>
-
-        <!-- Load Trackers —— tile layout -->
-        <div class="card">
-          <div class="card-header">Load Trackers</div>
-          <div class="tracker-tiles">
-            <div class="tracker-tile" id="night-tile">
-              <div class="tracker-icon">🌙</div>
-              <div class="tracker-phase">Night</div>
-              <div id="night-actual" class="tracker-value">—</div>
-              <div class="tracker-unit">kWh</div>
-              <div id="night-avg-line" class="tracker-avg">—</div>
-              <div id="night-dots" class="warmup-dots"></div>
-              <div class="tracker-snap">Sunset: <span id="sunset-snap">—</span></div>
-            </div>
-            <div class="tracker-tile" id="day-tile">
-              <div class="tracker-icon">☀️</div>
-              <div class="tracker-phase">Day</div>
-              <div id="day-actual" class="tracker-value">—</div>
-              <div class="tracker-unit">kWh</div>
-              <div id="day-avg-line" class="tracker-avg">—</div>
-              <div id="day-dots" class="warmup-dots"></div>
-              <div class="tracker-snap">Sunrise: <span id="sunrise-snap">—</span></div>
-            </div>
-            <div class="tracker-tile tracker-tile-managed" id="managed-tile">
-              <div class="tracker-icon">⚡</div>
-              <div class="tracker-phase">Managed Load</div>
-              <div id="managed-load" class="tracker-value">—</div>
-              <div class="tracker-unit">kWh</div>
-              <div class="tracker-avg">Since last horizon crossing</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Raw Configuration Inputs —— collapsed by default -->
-        <details class="collapsible-card">
-          <summary>Raw Sensor Inputs</summary>
-          <div class="grid-2">
-            <div>
-              <div class="metric-row">
-                <span>Total Home Energy (Cumulative)</span>
-                <span id="raw-home" class="value">-</span>
+            <!-- Expandable details -->
+            <details class="detail-group" style="margin-top:16px;">
+              <summary class="detail-summary">Today's Remaining Load Breakdown</summary>
+              <div class="metric-row" id="dyn-day-row">
+                <span id="dyn-day-label">Remaining Day Load</span>
+                <span id="dyn-day" class="value">-</span>
               </div>
               <div class="metric-row">
-                <span>Managed Load Sensor (Cumulative)</span>
-                <span id="raw-managed" class="value">-</span>
+                <span id="dyn-night-label">Remaining Night Load</span>
+                <span id="dyn-night" class="value">-</span>
               </div>
               <div class="metric-row">
-                <span>Battery Status Sensor (Raw)</span>
-                <span id="raw-battery-full" class="value">-</span>
+                <span>Morning Buffer</span>
+                <span id="dyn-buffer" class="value">-</span>
               </div>
-            </div>
-            <div>
+              <div class="metric-row total-row">
+                <span>= Expected Load</span>
+                <span id="dyn-total" class="value">-</span>
+              </div>
+            </details>
+            <details class="detail-group">
+              <summary class="detail-summary">Tomorrow's Deficit Breakdown</summary>
               <div class="metric-row">
-                <span>Solar Forecast Remaining Today</span>
-                <span id="raw-solar-today" class="value">-</span>
+                <span>Expected Usage</span>
+                <span id="tom-expected" class="value">-</span>
+              </div>
+              <div class="metric-row sub-row" id="tom-buffer-deduct-row">
+                <span>Less: Morning Buffer (reserved in Today's)</span>
+                <span id="tom-buffer-deduct" class="value">-</span>
               </div>
               <div class="metric-row">
                 <span>Solar Forecast Tomorrow</span>
-                <span id="raw-solar-tom" class="value">-</span>
+                <span id="solar-tom" class="value">-</span>
               </div>
-              <div class="metric-row">
-                <span>Rated Energy Capacity</span>
-                <span id="raw-cap" class="value">-</span>
+              <div class="metric-row total-row" id="tom-shortfall-row">
+                <span id="tom-shortfall-label">Shortfall (Deficit)</span>
+                <span id="tom-shortfall" class="value">-</span>
               </div>
-              <div class="metric-row" id="raw-solar-pwr-row" style="display:none">
-                <span>Current Solar Power (live)</span>
-                <span id="raw-solar-pwr" class="value">-</span>
+            </details>
+          </div>
+
+          <!-- Card 3: Surplus -->
+          <div class="card" style="display:flex; flex-direction:column;">
+            <div class="card-header">Calculated Surplus</div>
+            <div class="status-container" style="flex:1; padding-bottom:0;">
+              <div style="display:flex; align-items:baseline; justify-content:center; gap:6px;">
+                <div id="surplus-val" class="status-value status-neutral">-</div>
+                <span id="surplus-trend" class="trend-indicator"></span>
               </div>
-              <div class="metric-row" id="raw-home-pwr-row" style="display:none">
-                <span>Current Home Power (live)</span>
-                <span id="raw-home-pwr" class="value">-</span>
+              <div class="status-label">kWh</div>
+            </div>
+            <div class="master-footer" style="justify-content:center; border-top:none; margin-top:auto;">
+              <span id="sun-phase">-</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Battery Sustain -->
+        <h2 style="font-size:1.2rem; font-weight:500; margin:16px 0 8px; color:var(--primary-text-color); display:flex; align-items:center; gap:8px;" id="sustain-heading">
+          ⚡ Battery Sustain Analysis (Condition B)
+          <span class="sustain-header-chip na" id="sustain-chip" style="font-size:0.8rem;">—</span>
+        </h2>
+        <div class="dashboard-row row-2" id="sustain-card" style="display:none;">
+          <div class="card">
+            <div class="card-header" style="font-size:1.1rem; border-bottom:1px solid var(--divider-color, rgba(0,0,0,0.12)); padding-bottom:12px; margin-bottom:12px;">Current Power Load</div>
+            <div class="metric-row">
+              <span>Managed Load Peak (30-day)</span>
+              <span id="sustain-peak" class="value">—</span>
+            </div>
+            <div class="metric-row">
+              <span>Current Solar Generation</span>
+              <span id="sustain-solar-kw" class="value">—</span>
+            </div>
+            <div class="metric-row">
+              <span>Current Home Power</span>
+              <span id="sustain-home-kw" class="value">—</span>
+            </div>
+            <div class="metric-row total-row">
+              <span id="sustain-discharge-label" title="Projected Battery Drain Rate">Projected Drain Rate</span>
+              <span id="sustain-net-kw" class="value">—</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header" style="font-size:1.1rem; border-bottom:1px solid var(--divider-color, rgba(0,0,0,0.12)); padding-bottom:12px; margin-bottom:12px;">Battery Capacity Check</div>
+            <div class="metric-row">
+              <span>Usable Battery Remaining</span>
+              <span id="sustain-usable-kwh" class="value">—</span>
+            </div>
+            <div class="metric-row">
+              <span>Estimated Runway at this rate</span>
+              <span id="sustain-runway-hrs" class="value">—</span>
+            </div>
+            <div class="metric-row">
+              <span id="sustain-req-label">Required Morning Buffer Runway</span>
+              <span id="sustain-req-hrs" class="value">—</span>
+            </div>
+            <div class="metric-row total-row">
+              <span>Can Battery Sustain Load?</span>
+              <span id="sustain-result" class="value">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagnostics Section -->
+        <details class="collapsible-card" style="margin-top:16px;">
+          <summary>Diagnostics & History</summary>
+          <div style="margin-top:16px;">
+            <div class="card-header" style="font-size:1.1rem;">Load Trackers</div>
+            <div class="tracker-tiles">
+              <div class="tracker-tile" id="night-tile">
+                <div class="tracker-icon">🌙</div>
+                <div class="tracker-phase">Night</div>
+                <div id="night-actual" class="tracker-value">—</div>
+                <div class="tracker-unit">kWh</div>
+                <div id="night-avg-line" class="tracker-avg">—</div>
+                <div id="night-dots" class="warmup-dots"></div>
+                <div class="tracker-snap">Sunset: <span id="sunset-snap">—</span></div>
               </div>
-              <div class="metric-row" id="raw-peak-pwr-row" style="display:none">
-                <span>Managed Load 30-day Peak</span>
-                <span id="raw-peak-pwr" class="value">-</span>
+              <div class="tracker-tile" id="day-tile">
+                <div class="tracker-icon">☀️</div>
+                <div class="tracker-phase">Day</div>
+                <div id="day-actual" class="tracker-value">—</div>
+                <div class="tracker-unit">kWh</div>
+                <div id="day-avg-line" class="tracker-avg">—</div>
+                <div id="day-dots" class="warmup-dots"></div>
+                <div class="tracker-snap">Sunrise: <span id="sunrise-snap">—</span></div>
+              </div>
+              <div class="tracker-tile tracker-tile-managed" id="managed-tile">
+                <div class="tracker-icon">⚡</div>
+                <div class="tracker-phase">Managed Load</div>
+                <div id="managed-load" class="tracker-value">—</div>
+                <div class="tracker-unit">kWh</div>
+                <div class="tracker-avg">Since last horizon crossing</div>
+              </div>
+            </div>
+
+            <div class="card-header" style="font-size:1.1rem; margin-top:24px;">Raw Sensor Inputs</div>
+            <div class="grid-2">
+              <div>
+                <div class="metric-row">
+                  <span>Total Home Energy (Cumulative)</span>
+                  <span id="raw-home" class="value">-</span>
+                </div>
+                <div class="metric-row">
+                  <span>Managed Load Sensor (Cumulative)</span>
+                  <span id="raw-managed" class="value">-</span>
+                </div>
+                <div class="metric-row">
+                  <span>Battery Status Sensor (Raw)</span>
+                  <span id="raw-battery-full" class="value">-</span>
+                </div>
+              </div>
+              <div>
+                <div class="metric-row">
+                  <span>Solar Forecast Remaining Today</span>
+                  <span id="raw-solar-today" class="value">-</span>
+                </div>
+                <div class="metric-row">
+                  <span>Solar Forecast Tomorrow</span>
+                  <span id="raw-solar-tom" class="value">-</span>
+                </div>
+                <div class="metric-row">
+                  <span>Rated Energy Capacity</span>
+                  <span id="raw-cap" class="value">-</span>
+                </div>
+                <div class="metric-row" id="raw-solar-pwr-row" style="display:none">
+                  <span>Current Solar Power (live)</span>
+                  <span id="raw-solar-pwr" class="value">-</span>
+                </div>
+                <div class="metric-row" id="raw-home-pwr-row" style="display:none">
+                  <span>Current Home Power (live)</span>
+                  <span id="raw-home-pwr" class="value">-</span>
+                </div>
+                <div class="metric-row" id="raw-peak-pwr-row" style="display:none">
+                  <span>Managed Load 30-day Peak</span>
+                  <span id="raw-peak-pwr" class="value">-</span>
+                </div>
               </div>
             </div>
           </div>
@@ -794,7 +796,7 @@ class SolarReservePanel extends HTMLElement {
     if (srEntityIds.size === 0) {
       for (const entityId of Object.keys(states)) {
         if (entityId.startsWith('binary_sensor.ha_solar_reserve_') ||
-            entityId.startsWith('sensor.ha_solar_reserve_')) {
+          entityId.startsWith('sensor.ha_solar_reserve_')) {
           srEntityIds.add(entityId);
         }
       }
@@ -806,20 +808,20 @@ class SolarReservePanel extends HTMLElement {
     for (const entityId of srEntityIds) {
       const stateObj = states[entityId];
       if (!stateObj) continue;
-      if (entityId.includes('_permission'))              data.permission   = stateObj;
-      else if (entityId.includes('_calculated_surplus')) data.surplus      = stateObj;
-      else if (entityId.includes('_energy_available'))   data.available    = stateObj;
-      else if (entityId.includes('_energy_required'))    data.required     = stateObj;
+      if (entityId.includes('_permission')) data.permission = stateObj;
+      else if (entityId.includes('_calculated_surplus')) data.surplus = stateObj;
+      else if (entityId.includes('_energy_available')) data.available = stateObj;
+      else if (entityId.includes('_energy_required')) data.required = stateObj;
       else if (entityId.includes('_average_overnight_load')) data.avgNight = stateObj;
       else if (entityId.includes('_overnight_load_tracker')) data.actNight = stateObj;
-      else if (entityId.includes('_average_daytime_load'))   data.avgDay   = stateObj;
-      else if (entityId.includes('_daytime_load_tracker'))   data.actDay   = stateObj;
+      else if (entityId.includes('_average_daytime_load')) data.avgDay = stateObj;
+      else if (entityId.includes('_daytime_load_tracker')) data.actDay = stateObj;
       else if (entityId.includes('_current_battery_charge')) data.battCharge = stateObj;
-      else if (entityId.includes('_battery_capacity'))   data.batteryCap  = stateObj;
+      else if (entityId.includes('_battery_capacity')) data.batteryCap = stateObj;
       else if (entityId.includes('_solar_counted_today')) data.solarCounted = stateObj;
-      else if (entityId.includes('_managed_load_usage')) data.managed      = stateObj;
-      else if (entityId.includes('_night_data_days'))    data.nightDays    = stateObj;
-      else if (entityId.includes('_day_data_days'))      data.dayDays      = stateObj;
+      else if (entityId.includes('_managed_load_usage')) data.managed = stateObj;
+      else if (entityId.includes('_night_data_days')) data.nightDays = stateObj;
+      else if (entityId.includes('_day_data_days')) data.dayDays = stateObj;
     }
 
     // ── Formatting helpers ──────────────────────────────────────────────────
@@ -1052,23 +1054,27 @@ class SolarReservePanel extends HTMLElement {
 
       const pillA = this.shadowRoot.getElementById('cond-a');
       const iconA = this.shadowRoot.getElementById('cond-a-icon');
-      const valA  = this.shadowRoot.getElementById('cond-a-val');
+      const valA = this.shadowRoot.getElementById('cond-a-val');
+      const energyChip = this.shadowRoot.getElementById('energy-chip');
       if (pillA && iconA && valA) {
         if (condA === null) {
           pillA.className = 'cond-pill na';
           iconA.textContent = '○'; valA.textContent = '—';
+          if (energyChip) { energyChip.className = 'sustain-header-chip na'; energyChip.textContent = '—'; }
         } else if (condA) {
           pillA.className = 'cond-pill pass';
           iconA.textContent = '✓'; valA.textContent = surplus !== null ? ('+' + surplus.toFixed(2) + ' kWh') : '';
+          if (energyChip) { energyChip.className = 'sustain-header-chip pass'; energyChip.textContent = '✓ Pass'; }
         } else {
           pillA.className = 'cond-pill fail';
           iconA.textContent = '✗'; valA.textContent = surplus !== null ? (surplus.toFixed(2) + ' kWh') : '';
+          if (energyChip) { energyChip.className = 'sustain-header-chip fail'; energyChip.textContent = '✗ Fail'; }
         }
       }
 
       const pillB = this.shadowRoot.getElementById('cond-b');
       const iconB = this.shadowRoot.getElementById('cond-b-icon');
-      const valB  = this.shadowRoot.getElementById('cond-b-val');
+      const valB = this.shadowRoot.getElementById('cond-b-val');
       const labelB = this.shadowRoot.getElementById('cond-b-label');
       if (pillB && iconB && valB) {
         if (!hasSustain) {
@@ -1095,12 +1101,14 @@ class SolarReservePanel extends HTMLElement {
 
       // ── Battery Sustain analysis card ──────────────────────────────────────
       const sustainCard = this.shadowRoot.getElementById('sustain-card');
+      const sustainHeading = this.shadowRoot.getElementById('sustain-heading');
       if (sustainCard) sustainCard.style.display = hasSustain ? '' : 'none';
+      if (sustainHeading) sustainHeading.style.display = hasSustain ? 'flex' : 'none';
       if (hasSustain) {
-        const peakKw    = parseFloat(attrs.managed_load_peak_kw) || 0;
-        const solarKw   = parseFloat(attrs.current_solar_power_kw) || 0;
-        const homeKw    = parseFloat(attrs.current_home_power_kw) || 0;
-        const netKw     = parseFloat(attrs.net_battery_discharge_kw) || 0;
+        const peakKw = parseFloat(attrs.managed_load_peak_kw) || 0;
+        const solarKw = parseFloat(attrs.current_solar_power_kw) || 0;
+        const homeKw = parseFloat(attrs.current_home_power_kw) || 0;
+        const netKw = parseFloat(attrs.net_battery_discharge_kw) || 0;
         const sustainHrs = parseFloat(attrs.battery_sustain_hours) || 0;
         const emergResKwh = parseFloat(attrs.dyn_emergency_reserve_kwh) || 0;
         const curBattKwh = data.battCharge ? (parseFloat(data.battCharge.state) || 0) : 0;
@@ -1115,27 +1123,20 @@ class SolarReservePanel extends HTMLElement {
           chip.className = 'sustain-header-chip ' + (canSustain ? 'pass' : 'fail');
         }
 
-        // Prev permission to determine discharge label
-        const prevPerm = data.permission.state === 'on';
-        const dischLabel = this.shadowRoot.getElementById('sustain-discharge-label');
-        if (dischLabel) {
-          dischLabel.textContent = prevPerm
-            ? 'Net Battery Discharge (load currently ON)'
-            : 'Net Battery Discharge (load OFF → if turned ON)';
-        }
 
-        const fpKw  = v => v.toFixed(2) + ' kW';
+
+        const fpKw = v => v.toFixed(2) + ' kW';
         const fpHrs = v => (v >= 999 ? '∞' : v.toFixed(1)) + ' h';
-        setText('sustain-peak',     peakKw.toFixed(2) + ' kW');
+        setText('sustain-peak', peakKw.toFixed(2) + ' kW');
         setText('sustain-solar-kw', fpKw(solarKw));
-        setText('sustain-home-kw',  fpKw(homeKw));
-        setText('sustain-net-kw',   netKw === 0 ? '0.00 kW (solar covers load ✓)' : fpKw(netKw));
+        setText('sustain-home-kw', fpKw(homeKw));
+        setText('sustain-net-kw', netKw === 0 ? '0.00 kW (solar covers load ✓)' : fpKw(netKw));
         setText('sustain-usable-kwh', usableKwh.toFixed(2) + ' kWh');
         setText('sustain-runway-hrs', netKw > 0 ? fpHrs(sustainHrs) : '∞ (no discharge)');
 
         // Required runway label — always morning buffer runway (day and night)
         const reqLabel = this.shadowRoot.getElementById('sustain-req-label');
-        if (reqLabel) reqLabel.textContent = 'Required — morning buffer runway';
+        if (reqLabel) reqLabel.textContent = 'Required Morning Buffer Runway';
 
         // Required runway — quantified display
         let reqDisplay = '—';
@@ -1153,14 +1154,14 @@ class SolarReservePanel extends HTMLElement {
         }
 
         // Tooltips
-        setTooltip('sustain-peak',     '30-day historical peak draw of the managed load power sensor.');
+        setTooltip('sustain-peak', '30-day historical peak draw of the managed load power sensor.');
         setTooltip('sustain-solar-kw', 'Live instantaneous solar generation. Zero at night.');
-        setTooltip('sustain-home-kw',  'Live instantaneous total home power draw. Includes the managed load when it is currently running.');
-        setTooltip('sustain-net-kw',   'Net battery discharge rate if the managed load is ON = max(0, home + peak − solar). Zero means solar covers everything.');
+        setTooltip('sustain-home-kw', 'Live instantaneous total home power draw. Includes the managed load when it is currently running.');
+        setTooltip('sustain-net-kw', 'Net battery discharge rate if the managed load is ON = max(0, home + peak − solar). Zero means solar covers everything.');
         setTooltip('sustain-usable-kwh', 'Battery energy available above the emergency reserve floor.');
         setTooltip('sustain-runway-hrs', 'How long the battery can sustain the net discharge rate: usable battery ÷ net discharge rate.');
-        setTooltip('sustain-req-hrs',  'Minimum energy the battery must hold above the emergency floor: net discharge rate × morning buffer hours. Applied at all times.');
-        setTooltip('sustain-result',   'Whether the battery has sufficient runway to sustain the managed load without drawing from the grid.');
+        setTooltip('sustain-req-hrs', 'Minimum energy the battery must hold above the emergency floor: net discharge rate × morning buffer hours. Applied at all times.');
+        setTooltip('sustain-result', 'Whether the battery has sufficient runway to sustain the managed load without drawing from the grid.');
 
         // Show power sensor raw rows
         const showRow = (id, val, unit) => {
@@ -1215,21 +1216,6 @@ class SolarReservePanel extends HTMLElement {
       bindEntity('total-liab', data.required, 'Total energy the system needs to hold in reserve.');
     }
 
-    // ── Surplus equation strip ────────────────────────────────────────────
-    if (data.available && data.required) {
-      const avail = parseFloat(data.available.state);
-      const req = parseFloat(data.required.state);
-      const surp = avail - req;
-      const eqAvail = this.shadowRoot.getElementById('eq-available');
-      const eqReq = this.shadowRoot.getElementById('eq-required');
-      const eqSurp = this.shadowRoot.getElementById('eq-surplus');
-      if (eqAvail) eqAvail.textContent = avail.toFixed(2);
-      if (eqReq) eqReq.textContent = req.toFixed(2);
-      if (eqSurp) {
-        eqSurp.textContent = (surp >= 0 ? '+' : '') + surp.toFixed(2);
-        eqSurp.className = surp >= 0 ? 'eq-val eq-result-pos' : 'eq-val eq-result-neg';
-      }
-    }
 
     // ── Current Battery Charge (dedicated sensor) ──────────────────────────
     if (data.battCharge) {
